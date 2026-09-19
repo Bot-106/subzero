@@ -20,13 +20,13 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants;
-import frc.robot.commands.AlignToTagCommand;
+//import frc.robot.commands.AlignToTagCommand;
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
-import org.photonvision.EstimatedRobotPose;
+//import org.photonvision.EstimatedRobotPose;
 
 /**
  * Class that extends the Phoenix 6 SwerveDrivetrain class and implements Subsystem so it can easily
@@ -55,11 +55,11 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /* Keep track if we've ever applied the operator perspective before or not */
   private boolean m_hasAppliedOperatorPerspective = false;
 
-  /** Room cameras fused in {@link #updatePose()}; set once by RobotContainer via {@link #setCameras}. */
-  private List<RoomCamera> m_cameras = List.of();
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Room cameras fused in {@link #updatePose()}; set once by RobotContainer via {@link #setCameras}. */
+//  private List<RoomCamera> m_cameras = List.of();
 
   /** True once any vision estimate has been accepted (the outlier gate is bypassed until then). */
-  private boolean m_hasVisionFix = false;
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  private boolean m_hasVisionFix = false;
 
   /**
    * Field-centric facing-angle request: the driver translates while the drivetrain holds a heading
@@ -146,51 +146,51 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
   // ───────────────────────────── frozen seam (§3.1) ─────────────────────────────
 
-  /** Cameras to fuse in {@link #updatePose()}. Call once from RobotContainer after construction. */
-  public void setCameras(RoomCamera... cams) {
-    m_cameras = List.of(cams);
-  }
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Cameras to fuse in {@link #updatePose()}. Call once from RobotContainer after construction. */
+//  public void setCameras(RoomCamera... cams) {
+//    m_cameras = List.of(cams);
+//  }
 
-  /** Cameras fused by this drivetrain (empty until {@link #setCameras} is called). */
-  public List<RoomCamera> getCameras() {
-    return m_cameras;
-  }
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Cameras fused by this drivetrain (empty until {@link #setCameras} is called). */
+//  public List<RoomCamera> getCameras() {
+//    return m_cameras;
+//  }
 
   /** Current fused pose estimate (odometry + accepted vision), blue-alliance/room coordinates. */
   public Pose2d getPose() {
     return getState().Pose;
   }
 
-  /**
-   * Fuse every camera's {@link RoomCamera#update()} into the pose estimator. Called once per loop
-   * from {@link #periodic()}. Gate (2025 updatePose intent, re-enabled): an estimate farther than
-   * {@link Constants.VisionConstants#kVisionOutlierGate} from the current pose is rejected — unless
-   * no vision estimate has ever been accepted, so the first fix can pull odometry onto the room frame.
-   */
-  public void updatePose() {
-    final Pose2d current = getPose();
-    final double gateMeters = Constants.VisionConstants.kVisionOutlierGate.in(Meters);
-    for (RoomCamera cam : m_cameras) {
-      Optional<EstimatedRobotPose> est = cam.update(); // once per loop per camera (seam contract)
-      final String key = "Drive/Vision/" + cam.getName();
-      if (est.isEmpty()) {
-        Logger.recordOutput(key + "/HasEstimate", false);
-        continue;
-      }
-      final Pose2d visionPose = est.get().estimatedPose.toPose2d();
-      final double jump = visionPose.getTranslation().getDistance(current.getTranslation());
-      final boolean accepted = !m_hasVisionFix || jump <= gateMeters;
-      Logger.recordOutput(key + "/HasEstimate", true);
-      Logger.recordOutput(key + "/Pose", visionPose);
-      Logger.recordOutput(key + "/JumpMeters", jump);
-      Logger.recordOutput(key + "/Accepted", accepted);
-      if (accepted) {
-        // The override below converts the PhotonLib FPGA timestamp with Utils.fpgaToCurrentTime once.
-        addVisionMeasurement(visionPose, est.get().timestampSeconds, cam.getEstimationStdDevs());
-        m_hasVisionFix = true;
-      }
-    }
-  }
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  /**
+//   * Fuse every camera's {@link RoomCamera#update()} into the pose estimator. Called once per loop
+//   * from {@link #periodic()}. Gate (2025 updatePose intent, re-enabled): an estimate farther than
+//   * {@link Constants.VisionConstants#kVisionOutlierGate} from the current pose is rejected — unless
+//   * no vision estimate has ever been accepted, so the first fix can pull odometry onto the room frame.
+//   */
+//  public void updatePose() {
+//    final Pose2d current = getPose();
+//    final double gateMeters = Constants.VisionConstants.kVisionOutlierGate.in(Meters);
+//    for (RoomCamera cam : m_cameras) {
+//      Optional<EstimatedRobotPose> est = cam.update(); // once per loop per camera (seam contract)
+//      final String key = "Drive/Vision/" + cam.getName();
+//      if (est.isEmpty()) {
+//        Logger.recordOutput(key + "/HasEstimate", false);
+//        continue;
+//      }
+//      final Pose2d visionPose = est.get().estimatedPose.toPose2d();
+//      final double jump = visionPose.getTranslation().getDistance(current.getTranslation());
+//      final boolean accepted = !m_hasVisionFix || jump <= gateMeters;
+//      Logger.recordOutput(key + "/HasEstimate", true);
+//      Logger.recordOutput(key + "/Pose", visionPose);
+//      Logger.recordOutput(key + "/JumpMeters", jump);
+//      Logger.recordOutput(key + "/Accepted", accepted);
+//      if (accepted) {
+//        // The override below converts the PhotonLib FPGA timestamp with Utils.fpgaToCurrentTime once.
+//        addVisionMeasurement(visionPose, est.get().timestampSeconds, cam.getEstimationStdDevs());
+//        m_hasVisionFix = true;
+//      }
+//    }
+//  }
 
   /**
    * Returns a command that applies the specified control request to this swerve drivetrain.
@@ -202,14 +202,14 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     return run(() -> this.setControl(request.get()));
   }
 
-  /**
-   * Vision-leashed, speed-capped (safety §2/§7) drive to {@code robotToTagOffset} relative to tag
-   * {@code tagId}. The command itself (W3) owns the leash, caps, tolerance and the 8 s timeout and
-   * exposes {@link AlignToTagCommand#wasRefused()}.
-   */
-  public Command alignToTag(int tagId, Pose2d robotToTagOffset) {
-    return new AlignToTagCommand(this, getCameras(), tagId, robotToTagOffset);
-  }
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  /**
+//   * Vision-leashed, speed-capped (safety §2/§7) drive to {@code robotToTagOffset} relative to tag
+//   * {@code tagId}. The command itself (W3) owns the leash, caps, tolerance and the 8 s timeout and
+//   * exposes {@link AlignToTagCommand#wasRefused()}.
+//   */
+//  public Command alignToTag(int tagId, Pose2d robotToTagOffset) {
+//    return new AlignToTagCommand(this, getCameras(), tagId, robotToTagOffset);
+//  }
 
   // ───────────────────────────── periodic / sim ─────────────────────────────
 
@@ -234,7 +234,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
               });
     }
 
-    updatePose();
+//    updatePose();
 
     // AdvantageKit lite (D-21): outputs only. Struct types (Pose2d, SwerveModuleState[], ChassisSpeeds) are free.
     final var state = getState();
@@ -242,18 +242,18 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     Logger.recordOutput("Drive/ModuleStates", state.ModuleStates);
     Logger.recordOutput("Drive/ModuleTargets", state.ModuleTargets);
     Logger.recordOutput("Drive/Speeds", state.Speeds);
-    Logger.recordOutput("Drive/HasVisionFix", m_hasVisionFix);
-    Logger.recordOutput("Drive/CameraCount", m_cameras.size());
+//    Logger.recordOutput("Drive/HasVisionFix", m_hasVisionFix);
+//    Logger.recordOutput("Drive/CameraCount", m_cameras.size());
   }
 
-  /** Main-thread sim hook: feed ground truth to each camera's VisionSystemSim (seam: updateSimPose). */
-  @Override
-  public void simulationPeriodic() {
-    final Pose2d truth = getPose();
-    for (RoomCamera cam : m_cameras) {
-      cam.updateSimPose(truth);
-    }
-  }
+//  /** Main-thread sim hook: feed ground truth to each camera's VisionSystemSim (seam: updateSimPose). */
+//  @Override
+// [M0: vision/align seam commented out — restore from tag m1-sim] //  public void simulationPeriodic() {
+//    final Pose2d truth = getPose();
+//    for (RoomCamera cam : m_cameras) {
+//      cam.updateSimPose(truth);
+//    }
+//  }
 
   private void startSimThread() {
     m_lastSimTime = Utils.getCurrentTimeSeconds();

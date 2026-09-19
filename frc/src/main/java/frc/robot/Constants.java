@@ -31,6 +31,14 @@ public final class Constants {
   public static final String kCanBusName = "rio";
 
   // ───────────────────────────── Elevator ─────────────────────────────
+  /**
+   * NOTE (2026-09-19, M0 hardware config): subsystems/Elevator.java is the Tuner X generated file from
+   * FRC1360/SwerveProgrammingChassis/CTREELEVATOR, matched EXACTLY (leader 50 / follower 61 on rio,
+   * ratio 4, drum 0.0191008 m, Coast, 120 A stator, kP 16 / kS 0.2 / kV 0.48, MotionMagic 12 rps /
+   * 80 rps², hardware limit switches on the leader, setpoints Top = 7 rot, Ground = 6 rot,
+   * calibrateZero at −10 % duty). It does NOT read the constants below; they are kept for the full
+   * (seam-based) Elevator at git tag m1-sim.
+   */
   public static final class ElevatorConstants {
     private ElevatorConstants() {}
 

@@ -6,161 +6,106 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.OperatorConstants;
-import frc.robot.Constants.TaskConstants;
-import frc.robot.Constants.VisionConstants;
-import frc.robot.commands.SimSequence;
-import frc.robot.commands.Stow;
 import frc.robot.generated.TunerConstants;
-import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Elevator;
-import frc.robot.subsystems.RoomCamera;
-import frc.robot.tasks.TaskNtBridge;
-import frc.robot.tasks.TaskPrimitives;
-import frc.robot.tasks.ToolClient;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.BooleanSupplier;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * Wires subsystems, the NT task bridge and the H-21 driver bindings.
+ * M0 hardware configuration (2026-09-19): DRIVETRAIN + ELEVATOR ONLY.
  *
- * <p>Safety §3: every automated command is `.until(driverInputActive)`; teleop defaults to
- * {@link DriveConstants#kTeleopScalar} (50 %). Safety §1: homing only runs on an enable edge (A-01).
+ * <p>Everything else (Arm, RoomCamera, AlignToTagCommand, Stow, SimSequence, tasks/*) is commented
+ * out — the full M1 wiring is at git tag {@code m1-sim} (this file's previous version is
+ * RobotContainer at that tag).
+ *
+ * <p>Controls: left stick = translate (field-centric), right stick X = rotate; B = zero yaw
+ * (seedFieldCentric — current heading becomes "forward"); X = elevator to Ground (6 rot);
+ * Y = elevator to Top (7 rot). The elevator calibrates its zero (hard stop, −10 % duty) on the first
+ * teleop/test enable (A-01); zero is its home.
  */
 public class RobotContainer {
-  private static final double kMaxSpeedMps = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
-  private static final double kMaxAngularRateRadPerSec =
-      RotationsPerSecond.of(0.75).in(RadiansPerSecond);
+  // ───────────── drivetrain (W1) ─────────────
+  private final double kMaxSpeed =
+      TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * Constants.DriveConstants.kTeleopScalar; // safety §2: 50 % teleop default
+  private final double kMaxAngularRate =
+      RotationsPerSecond.of(0.75).in(RadiansPerSecond) * Constants.DriveConstants.kTeleopScalar;
 
-  private final CommandSwerveDrivetrain drivetrain;
-  private final Elevator elevator;
-  private final Arm arm;
-  private final RoomCamera frontLeftCamera;
-  private final RoomCamera frontRightCamera;
-  private final ToolClient toolClient;
-  private final TaskPrimitives primitives;
-  private final TaskNtBridge ntBridge;
+  private final SwerveRequest.FieldCentric drive =
+      new SwerveRequest.FieldCentric()
+          .withDeadband(kMaxSpeed * OperatorConstants.kStickDeadband)
+          .withRotationalDeadband(kMaxAngularRate * OperatorConstants.kStickDeadband)
+          .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
+  private final SwerveRequest.Idle idle = new SwerveRequest.Idle();
 
-  private final CommandXboxController driver =
+  public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
+
+  // ───────────── elevator (CTREELEVATOR config, exact) ─────────────
+  public final Elevator elevator = new Elevator();
+  private boolean elevatorCalibrated = false;
+
+  private final CommandXboxController joystick =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
 
-  /** Any stick input above the threshold interrupts an automated command (safety §3). */
-  private final BooleanSupplier driverInputActive =
-      () -> {
-        double t = OperatorConstants.kDriverInterruptThreshold;
-        return Math.abs(driver.getLeftX()) > t
-            || Math.abs(driver.getLeftY()) > t
-            || Math.abs(driver.getRightX()) > t;
-      };
-
-  private final SwerveRequest.FieldCentric fieldCentric =
-      new SwerveRequest.FieldCentric()
-          .withDeadband(kMaxSpeedMps * OperatorConstants.kStickDeadband)
-          .withRotationalDeadband(kMaxAngularRateRadPerSec * OperatorConstants.kStickDeadband)
-          .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
-
-  /** True when the orchestrator's headless acceptance driver owns the first enable (A-05). */
-  private final boolean simSequenceMode =
-      RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_AUTOENABLE") != null;
+  // ───────────── commented out for M0 (restore from tag m1-sim) ─────────────
+  // public final Arm arm = new Arm();
+  // private final RoomCamera camFL = new RoomCamera(VisionConstants.kFrontLeftCameraName, VisionConstants.kRobotToFrontLeftCamera, drivetrain::getPose);
+  // private final RoomCamera camFR = new RoomCamera(VisionConstants.kFrontRightCameraName, VisionConstants.kRobotToFrontRightCamera, drivetrain::getPose);
+  // private final ToolClient toolClient = new ToolClient();
+  // private final TaskPrimitives primitives = ...;
+  // private final TaskNtBridge ntBridge = ...;
+  // private final Command simSequence = new SimSequence(...);
 
   public RobotContainer() {
-    drivetrain = TunerConstants.createDrivetrain();
-    elevator = new Elevator();
-    arm = new Arm();
-    frontLeftCamera =
-        new RoomCamera(
-            VisionConstants.kFrontLeftCameraName,
-            VisionConstants.kRobotToFrontLeftCamera,
-            drivetrain::getPose);
-    frontRightCamera =
-        new RoomCamera(
-            VisionConstants.kFrontRightCameraName,
-            VisionConstants.kRobotToFrontRightCamera,
-            drivetrain::getPose);
-    drivetrain.setCameras(frontLeftCamera, frontRightCamera);
-
-    toolClient = new ToolClient();
-    // The sink reads the ntBridge field at call time, so the construction order below is safe.
-    primitives =
-        new TaskPrimitives(
-            drivetrain, elevator, arm, toolClient, driverInputActive, this::onTaskState);
-    ntBridge = new TaskNtBridge(drivetrain, elevator, arm, toolClient, primitives);
-
-    configureDefaultCommands();
     configureBindings();
-    configureHoming();
-    Logger.recordOutput("Robot/SimSequenceMode", simSequenceMode);
   }
 
-  private void onTaskState(TaskPrimitives.TaskReport report) {
-    if (ntBridge != null) {
-      ntBridge.publishState(report);
-    }
-  }
-
-  private void configureDefaultCommands() {
-    double s = DriveConstants.kTeleopScalar;
+  private void configureBindings() {
+    // Two sticks: left = translate, right X = rotate. forward = -Y, left = -X, CCW = -X.
     drivetrain.setDefaultCommand(
-        drivetrain
-            .applyRequest(
-                () ->
-                    fieldCentric
-                        .withVelocityX(-driver.getLeftY() * kMaxSpeedMps * s)
-                        .withVelocityY(-driver.getLeftX() * kMaxSpeedMps * s)
-                        .withRotationalRate(-driver.getRightX() * kMaxAngularRateRadPerSec * s))
-            .withName("TeleopDrive"));
-  }
+        drivetrain.applyRequest(
+            () ->
+                drive
+                    .withVelocityX(-joystick.getLeftY() * kMaxSpeed)
+                    .withVelocityY(-joystick.getLeftX() * kMaxSpeed)
+                    .withRotationalRate(-joystick.getRightX() * kMaxAngularRate)));
 
-  /** A-01: home on the first teleop/test enable — unless SimSequence homes itself. */
-  private void configureHoming() {
-    if (simSequenceMode) {
-      new Trigger(DriverStation::isEnabled).onTrue(new SimSequence(drivetrain, elevator, arm));
-      return;
-    }
+    // Idle while disabled so the configured neutral mode is applied (safety §1).
+    RobotModeTriggers.disabled().whileTrue(drivetrain.applyRequest(() -> idle).ignoringDisable(true));
+
+    // B: zero yaw — the current heading becomes field-forward.
+    joystick.b().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric).withName("ZeroYaw"));
+
+    // Elevator: calibrate zero on the FIRST teleop/test enable (A-01), never while disabled.
     RobotModeTriggers.teleop()
         .or(RobotModeTriggers.test())
         .onTrue(
-            Commands.sequence(arm.home(), elevator.home())
-                .unless(() -> elevator.isHomed() && arm.isHomed())
-                .withName("HomeOnEnable"));
+            elevator
+                .calibrateZero()
+                .andThen(Commands.runOnce(() -> elevatorCalibrated = true))
+                .unless(() -> elevatorCalibrated)
+                .withName("ElevatorCalibrateZero"));
+
+    // X / Y: two setpoints other than the homed zero (Ground = 6 rot, Top = 7 rot — CTREELEVATOR
+    // Setpoint enum). goToSetpoint runs until the other button replaces it, so it holds there.
+    joystick.x().onTrue(elevator.goToSetpoint(() -> Elevator.Setpoint.Ground).withName("ElevatorGround"));
+    joystick.y().onTrue(elevator.goToSetpoint(() -> Elevator.Setpoint.Top).withName("ElevatorTop"));
+
+    // ── commented out for M0 (H-21 M1 bindings; restore from tag m1-sim) ──
+    // joystick.a().onTrue(alignToNearestTag());
+    // joystick.b().onTrue(new Stow(elevator, arm));
+    // joystick.x().onTrue(primitives.toolOp(TaskConstants.kDefaultToolId, "latch", 0));
+    // joystick.y().onTrue(primitives.toolOp(TaskConstants.kDefaultToolId, "release", 0));
+    // new Trigger(DriverStation::isEnabled).onTrue(simSequence);   // SUBZERO_SIM_AUTOENABLE mode
   }
 
-  /** H-21: A = alignToTag(nearest), B = stow, X = tool latch, Y = tool release. */
-  private void configureBindings() {
-    driver.a().onTrue(Commands.defer(this::alignToNearestTag, Set.of(drivetrain)));
-    driver.b().onTrue(new Stow(elevator, arm).until(driverInputActive).withName("StowButton"));
-    driver.x().onTrue(primitives.toolOp(TaskConstants.kDefaultToolId, "latch", 0));
-    driver.y().onTrue(primitives.toolOp(TaskConstants.kDefaultToolId, "release", 0));
-  }
-
-  /** First non-empty getBestVisibleTagId() across the cameras, else a "no tag" print. */
-  private Command alignToNearestTag() {
-    Optional<Integer> tag = Optional.empty();
-    for (RoomCamera cam : drivetrain.getCameras()) {
-      tag = cam.getBestVisibleTagId();
-      if (tag.isPresent()) {
-        break;
-      }
-    }
-    if (tag.isEmpty()) {
-      return Commands.print("alignToTag: no tag");
-    }
-    return primitives.alignToTag(
-        tag.get(),
-        TaskConstants.kPickOffsetX_m,
-        TaskConstants.kPickOffsetY_m,
-        TaskConstants.kPickYaw_deg);
+  /** Called from Robot.robotPeriodic(); logging only. */
+  public void logPeriodic() {
+    Logger.recordOutput("Elevator/calibrated", elevatorCalibrated);
   }
 
   public Command getAutonomousCommand() {

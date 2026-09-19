@@ -2,6 +2,14 @@
 
 An FRC-style swerve robot with a 1.5 m elevator, an extending arm and WiFi servo tools, aligning to AprilTags in a hackathon room and picking/placing with swappable tools. The monorepo holds the RoboRIO code (`frc/`, WPILib 2026 + Phoenix6 + PhotonLib + AdvantageKit), the ESP32-S3 tool firmware (`esp32/`), the laptop NT4↔HTTP bridge and human-control CLI (`integration/`), the Jetson/PhotonVision runbook (`jetson/`) and the room-layout / hardware docs (`docs/`). See `CLAUDE.md` for how to build, simulate and test each part; `docs/contracts.md` for the frozen NT / HTTP / primitive contracts.
 
+## Current HEAD = M0 hardware config (2026-09-19 03:05) — drivetrain + elevator only
+
+- `frc/` is reduced to **CommandSwerveDrivetrain + Elevator**. `Elevator.java` is the Tuner X file from `FRC1360/SwerveProgrammingChassis/CTREELEVATOR` (commit `0d19dde`) with its config matched exactly: leader 50 / follower 61 (`rio`, Opposed), ratio 4, drum 0.0191008 m, **Coast**, **120 A** stator, kP 16 / kS 0.2 / kV 0.48 / kG 0, MotionMagic 12 rps / 80 rps², hardware limit switches on the leader (fwd + rev, NormallyOpen), `Setpoint.Top = 7 rot`, `Setpoint.Ground = 6 rot`, `calibrateZero()` at −10 % duty until the hard-stop trigger (|v| < 1 rps && |I| > 10 A, 0.1 s). Only the four `Logger.recordOutput` lines in `periodic()` were added.
+- **Controls:** left stick translate / right stick X rotate (field-centric, 50 % scalar) · **B** = zero yaw (`seedFieldCentric`) · **X** = elevator Ground (6 rot) · **Y** = elevator Top (7 rot) · elevator calibrates zero on the first teleop/test enable.
+- Commented out (every line prefixed `// `; the full M1 wiring is at tag **`m1-sim`**): `Arm`, `RoomCamera`, `AlignToTagCommand`, `Stow`, `SimSequence`, `tasks/*`, and the vision/align seams in the drivetrain. Restore a file with `sed -i '' '1d;s|^// ||' <file>` or `git checkout m1-sim -- frc/`.
+- Proof: `./gradlew build` exit 0; headless sim `frc/logs/akit_26-09-19_03-03-59.wpilog` — enabled, `calibrateZero` fired the hard-stop trigger (torque −48 A), `Elevator/calibrated` true at 0.87 s, no exceptions. The reference's `kMaxHeight = 0 m` makes its `ElevatorSim` degenerate, so X/Y setpoints are hardware-only checks.
+- Safety note (deliberate deviation from safety.md §4 at the user's request to match the reference exactly): the elevator is **Coast** with a **120 A** stator limit and a 0-output default command — it will fall when disabled or idle; keep hands clear and a spotter present.
+
 ## Status (REPO POP session 2026-09-19 01:57–02:40; agents prove sim only — humans prove hardware)
 
 | Item | Status | Evidence |
