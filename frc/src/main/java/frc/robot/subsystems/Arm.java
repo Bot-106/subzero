@@ -113,7 +113,7 @@ public class Arm extends SubsystemBase {
   private boolean homing = false;
   private double setpointMeters = 0.0;
   private boolean atSetpointLatched = false;
-  private final Debouncer atSetpointDebouncer =
+  private Debouncer atSetpointDebouncer =
       new Debouncer(kToleranceHoldSeconds, DebounceType.kRising);
   private final Debouncer switchDebouncer = new Debouncer(kSwitchDebounceSeconds, DebounceType.kRising);
   private boolean switchPressedRaw = false;
@@ -205,7 +205,15 @@ public class Arm extends SubsystemBase {
             ArmConstants.kSoftLimitIn.in(Meters),
             ArmConstants.kSoftLimitOut.in(Meters));
     final Command move =
-        runOnce(() -> setpointMeters = targetMeters)
+        runOnce(
+                () -> {
+                  setpointMeters = targetMeters;
+                  // Reset the settle latch so a goTo issued from rest cannot finish on the stale
+                  // "at previous setpoint" value computed by periodic() earlier in this loop.
+                  atSetpointLatched = false;
+                  atSetpointDebouncer =
+                      new Debouncer(ArmConstants.kToleranceHoldSeconds, DebounceType.kRising);
+                })
             .andThen(
                 run(
                     () ->

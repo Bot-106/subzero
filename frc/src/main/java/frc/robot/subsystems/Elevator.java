@@ -134,7 +134,7 @@ public class Elevator extends SubsystemBase {
   private boolean homing = false;
   private double setpointMeters = 0.0;
   private boolean atSetpointLatched = false;
-  private final Debouncer atSetpointDebouncer =
+  private Debouncer atSetpointDebouncer =
       new Debouncer(ElevatorConstants.kToleranceHoldSeconds, DebounceType.kRising);
 
   // cached from the last periodic() refresh
@@ -236,7 +236,15 @@ public class Elevator extends SubsystemBase {
             ElevatorConstants.kSoftLimitBottom.in(Meters),
             ElevatorConstants.kSoftLimitTop.in(Meters));
     final Command move =
-        runOnce(() -> setpointMeters = targetMeters)
+        runOnce(
+                () -> {
+                  setpointMeters = targetMeters;
+                  // Reset the settle latch so a goTo issued from rest cannot finish on the stale
+                  // "at previous setpoint" value computed by periodic() earlier in this loop.
+                  atSetpointLatched = false;
+                  atSetpointDebouncer =
+                      new Debouncer(ElevatorConstants.kToleranceHoldSeconds, DebounceType.kRising);
+                })
             .andThen(run(() -> leader.setControl(setpointRequest.withPosition(rotOf(targetMeters)))))
             .until(this::atSetpoint)
             .withTimeout(kGoToTimeoutSeconds);
