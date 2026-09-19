@@ -110,18 +110,17 @@ public final class Constants {
   public static final class ArmConstants {
     private ArmConstants() {}
 
-    // TODO(hardware) H-05 — arm Kraken X60 CAN id (rio bus).
+    // TODO(hardware) H-05 — arm Kraken X60 CAN id (rio bus). ONE motor, no follower.
     public static final int kCanId = 40;
 
-    // TODO(hardware) H-06 — gear ratio, pulley pitch (m per mechanism rotation), total travel, DIO channel + NO/NC.
+    // TODO(hardware) H-06 — gear ratio and pulley pitch (m of extension per mechanism rotation), total travel.
+    // The arm is a LINEAR axis (3D-printer X carriage), not a pivot: no limit switches; zero = wherever the
+    // carriage is at power-on (Back button re-zeroes at the current position). Soft limits are relative to that zero.
     public static final double kSensorToMechanismRatio = 9.0;
     public static final Distance kMetersPerRotation = Meters.of(0.05);
     public static final Distance kMaxExtension = Meters.of(0.45);
     public static final Distance kSoftLimitOut = Meters.of(0.43);
     public static final Distance kSoftLimitIn = Meters.of(0.0);
-    public static final int kHomeSwitchDioChannel = 0;
-    /** true = switch reads HIGH (pulled up) when open, LOW when pressed (normally-open to ground). */
-    public static final boolean kHomeSwitchNormallyOpen = true;
 
     // TODO(hardware) H-07 — extension setpoints (m): retracted / rack / pick / place.
     public static final Distance kRetracted = Meters.of(0.0);
@@ -133,28 +132,27 @@ public final class Constants {
     public static final Current kStatorCurrentLimit = Amps.of(60);
     public static final boolean kBrakeNeutral = true;
 
-    /** Homing: retract at ≤ 10 % duty until the DIO switch, with a timeout. */
-    public static final double kHomingDutyCycle = -0.08;
-    public static final double kHomingTimeoutSeconds = 5.0;
+    /** Manual jog (triggers) duty cycle — low on purpose for the first hardware test. */
+    public static final double kJogDutyCycle = 0.15;
 
     public static final Distance kTolerance = Meters.of(0.02);
 
-    public static final double kP = 12.0; // V per mechanism rotation (0.05 m)
+    // ── MotionMagic + feedforward (see docs/motionmagic-tuning.md). Units: mechanism rotations (after the 9:1).
+    // Linear horizontal axis → no gravity term: kG = 0 (GravityType Elevator_Static = constant, so a small
+    // kG only if the axis is inclined). TODO(tuning) — all of these are untuned placeholders.
+    public static final double kP = 12.0; // V per mechanism rotation (= per 0.05 m) of error
     public static final double kI = 0.0;
     public static final double kD = 0.0;
-    public static final double kS = 0.15;
-    public static final double kG = 0.0; // horizontal — TODO(tuning) small constant if the arm is inclined
-    public static final double kV = 1.08; // 12 V / 100 rps × ratio 9
-    public static final double kA = 0.0;
-    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);
-    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0);
+    public static final double kS = 0.15; // V to overcome static friction (find with the jog test)
+    public static final double kG = 0.0;  // horizontal axis
+    public static final double kV = 1.08; // V per mechanism rps: 12 V / (100 rps rotor free speed / 9)
+    public static final double kA = 0.0;  // V per mechanism rps²
+    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);      // 6 mech rps
+    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0); // 20 mech rps²
     public static final double kGoToTimeoutSeconds = 6.0;
-    public static final double kToleranceHoldSeconds = 0.2; // contract C.3 armTo
-    public static final double kSwitchDebounceSeconds = 0.04;
-    // TODO(hardware) H-06-adjacent, sim only — real arm mass.
+    public static final double kToleranceHoldSeconds = 0.2;
+    // TODO(hardware) H-06-adjacent, sim only — real carriage mass.
     public static final double kSimCarriageMassKg = 2.0;
-    public static final Distance kSimStartExtension = Meters.of(0.05);
-    public static final Distance kSimSwitchPressedBelow = Meters.of(0.002);
     public static final double kSimLoopPeriodSeconds = 0.005;
   }
 
@@ -166,7 +164,7 @@ public final class Constants {
     public static final LinearVelocity kAutoMaxSpeed = MetersPerSecond.of(1.0);
     public static final AngularVelocity kAutoMaxAngularRate = DegreesPerSecond.of(90);
     public static final double kAutoMaxAccelMps2 = 1.5;
-    public static final double kTeleopScalar = 0.5;
+    public static final double kTeleopScalar = 0.1;
 
     /** alignToTag tolerance + leash (safety §7). */
     public static final Distance kAlignTolerance = Meters.of(0.03);
