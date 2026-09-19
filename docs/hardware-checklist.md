@@ -42,7 +42,9 @@ encodes `00-brief/safety.md` items 2, 6, 8, 9 explicitly (marked below) and
    ```
    Then stop sending heartbeats for 1 s and confirm `curl
    http://10.13.60.31/status` shows `"state":"LOST_LINK"`.
-9. [ ] **H-11 hardware half** — with the latch servo detached (limp) on
+8b. [ ] **Pincher bench** (arm board, `10.13.60.30`, `esp32/pincher/README.md`): same six routes; `/latch` = pinch, `/release` = open, `/lateral {"mm"}` = jaw gap. Find the real `JAW_*_OPEN/CLOSED_DEG` with `/lateral` steps before loading a tool. **`/estop` on the pincher HOLDS** (keeps the grip; deliberate — see README) — confirm that is what you want with a tool in the jaws.
+8c. [ ] **End-effector calibration** (`10.13.60.31/.32`, `esp32/endeffector/README.md`): DRV8833 + pot emulate the servo. Power up with the axis free, `curl /status` at both mechanical end stops → `POT_MV_AT_0DEG` / `POT_MV_AT_180DEG` (keep both ≤ ~3000 mV), rebuild; first move with `EMU_MAX_DUTY` low and a hand on the power — if the axis runs AWAY from the target it stalls and FAULTs after 2 s: set `POT_INVERT 1`. Pot MUST be on GPIO1–10 (ADC1; ADC2 dies under WiFi).
+9. [ ] **H-11 hardware half** — with the end-effector axis detached (limp, DRV8833 asleep) on
    `/estop`, does the tool fall off the hook?
    - If **yes**: flip `ESTOP_BEHAVIOUR` in `esp32/include/config.h` from
      `ESTOP_BEHAVIOUR_DETACH` to `HOLD`.
