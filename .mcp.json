@@ -1,0 +1,1 @@
+{"mcpServers":{"frc-mcp":{"command":"npx","args":["tsx","/Users/adityachoudhuri/Personal Projects/FRC MCP/frc-mcp/src/index.ts"],"env":{"ROBOT_PROJECT_PATH":"/Users/adityachoudhuri/Personal Projects/subzero/frc"}}}}

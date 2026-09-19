@@ -1,0 +1,1 @@
+{"permissions":{"allow":["Bash(./gradlew *)","Bash(pio *)","Bash(uv *)","Bash(curl *)","Bash(bash -n *)","Bash(git *)"]}}
