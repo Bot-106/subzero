@@ -8,3 +8,7 @@ esp32/.pio
 integration/.venv
 **/__pycache__
 .DS_Store
+frc/.project
+frc/.settings
+frc/.classpath
+frc/networktables.json
