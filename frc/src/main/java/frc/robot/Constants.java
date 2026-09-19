@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.Meters;
 import static edu.wpi.first.units.Units.MetersPerSecond;
+import static edu.wpi.first.units.Units.MetersPerSecondPerSecond;
 
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
@@ -12,6 +13,7 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Distance;
+import edu.wpi.first.units.measure.LinearAcceleration;
 import edu.wpi.first.units.measure.LinearVelocity;
 
 /**
@@ -71,6 +73,29 @@ public final class Constants {
 
     public static final Distance kTolerance = Meters.of(0.02);
     public static final double kToleranceHoldSeconds = 0.2;
+
+    /** Slot0 (MotionMagicVoltage): V per mechanism rotation / per mechanism rps. Generated except kG. */
+    public static final double kP = 16.0;
+    public static final double kI = 0.0;
+    public static final double kD = 0.0;
+    public static final double kS = 0.2;
+    // TODO(tuning) generated kG = 0 (no gravity hold); 0.35 V ≈ 8 kg carriage on 2× Kraken X60 @ 4:1 (sim-derived).
+    public static final double kG = 0.35;
+    public static final double kV = 0.48; // 12 V / 100 rps × ratio 4
+    public static final double kA = 0.0;
+    /** MotionMagic profile in carriage units; converted to mechanism rot/s and rot/s² in Elevator. */
+    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(1.0);
+    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(2.5);
+    public static final double kGoToTimeoutSeconds = 8.0;
+    public static final double kHomingStallVelocityRps = 0.05;
+    public static final double kHomingMinRunSeconds = 0.3;
+    public static final double kHomingStallHoldSeconds = 0.2;
+    public static final double kHomingCurrentDebounceSeconds = 0.1;
+    // TODO(hardware) H-01-adjacent, sim only — real carriage mass (never reaches the robot).
+    public static final double kSimCarriageMassKg = 8.0;
+    public static final Distance kSimStartHeight = Meters.of(0.10);
+    public static final Distance kSimFloorEpsilon = Meters.of(0.001);
+    public static final double kSimLoopPeriodSeconds = 0.005;
   }
 
   // ─────────────────────────────── Arm ────────────────────────────────
@@ -105,6 +130,24 @@ public final class Constants {
     public static final double kHomingTimeoutSeconds = 5.0;
 
     public static final Distance kTolerance = Meters.of(0.02);
+
+    public static final double kP = 12.0; // V per mechanism rotation (0.05 m)
+    public static final double kI = 0.0;
+    public static final double kD = 0.0;
+    public static final double kS = 0.15;
+    public static final double kG = 0.0; // horizontal — TODO(tuning) small constant if the arm is inclined
+    public static final double kV = 1.08; // 12 V / 100 rps × ratio 9
+    public static final double kA = 0.0;
+    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);
+    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0);
+    public static final double kGoToTimeoutSeconds = 6.0;
+    public static final double kToleranceHoldSeconds = 0.2; // contract C.3 armTo
+    public static final double kSwitchDebounceSeconds = 0.04;
+    // TODO(hardware) H-06-adjacent, sim only — real arm mass.
+    public static final double kSimCarriageMassKg = 2.0;
+    public static final Distance kSimStartExtension = Meters.of(0.05);
+    public static final Distance kSimSwitchPressedBelow = Meters.of(0.002);
+    public static final double kSimLoopPeriodSeconds = 0.005;
   }
 
   // ─────────────────────────────── Drive ──────────────────────────────
@@ -124,6 +167,14 @@ public final class Constants {
     public static final double kAlignTagStaleSeconds = 0.5;
     public static final Distance kAlignMaxPoseJump = Meters.of(1.0);
     public static final double kAlignTimeoutSeconds = 8.0;
+
+    /** alignToTag gains (not hardware). Sim-proven (W3): 1.5 m / 20° → < 3 cm / 2° in 3.1 s under the caps. */
+    public static final double kAlignTranslationP = 4.5;
+    public static final double kAlignTranslationI = 0.0;
+    public static final double kAlignTranslationD = 0.05;
+    public static final double kAlignRotationP = 5.0;
+    public static final double kAlignRotationI = 0.0;
+    public static final double kAlignRotationD = 0.1;
 
     // TODO(hardware) H-19 — confirm 2025 encoder offsets + kSpeedAt12Volts after any module service (keep 2025 values).
     public static final boolean kUse2025ModuleOffsets = true;
@@ -170,6 +221,16 @@ public final class Constants {
     public static final double kMaxAmbiguity = 0.2;
     public static final Distance kMaxSingleTagDistance = Meters.of(4.0);
     public static final Distance kVisionOutlierGate = Meters.of(0.5);
+
+    /** Sim camera model only (not hardware). 120° diag is required for the ±45°-yawed H-14 placeholder mounts to see the tag from the SimSequence start pose. */
+    public static final int kSimCameraWidthPx = 960;
+    public static final int kSimCameraHeightPx = 720;
+    public static final double kSimCameraFovDiagDeg = 120.0;
+    public static final double kSimCameraFps = 30.0;
+    public static final double kSimCameraAvgLatencyMs = 5.0;
+    public static final double kSimCameraLatencyStdDevMs = 0.0;
+    public static final double kSimCameraAvgErrorPx = 0.0;
+    public static final double kSimCameraErrorStdDevPx = 0.0;
   }
 
   // ─────────────────────────────── Tasks / tools ──────────────────────
@@ -179,6 +240,8 @@ public final class Constants {
     /** Contract C.1: tool command treated as failed after 1.5 s without ack. */
     public static final double kToolAckTimeoutSeconds = 1.5;
     public static final double kBridgeAliveStaleSeconds = 1.0;
+    /** Time-box for elevatorTo / armTo (stow uses 2x) and each SimSequence step; MotionMagic moves take < 3 s. */
+    public static final double kMechanismTimeoutSeconds = 6.0;
 
     // TODO(hardware) H-13 — tool ids ↔ static IPs live in integration/bridge/config.yaml; the RoboRIO only knows ids.
     public static final int kToolIdCount = 2; // H-09

@@ -1,12 +1,25 @@
 package frc.robot.commands;
 
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import frc.robot.Constants.ArmConstants;
+import frc.robot.Constants.ElevatorConstants;
 import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.Elevator;
 
-/** SEAM STUB (§3.1) — W2 replaces this file: arm retracted, then elevator to stow height. */
+/**
+ * Stow pose (safety §6): arm fully retracted FIRST, then elevator down to {@code kStowHeight}. Every
+ * composite starts and ends here. Ordering matters — the arm must be inside the robot footprint before
+ * the carriage moves (1360 Session 10 "armFirst" branch). The {@code goTo} refusals mean an unhomed axis
+ * never moves: this group then degrades to two printed refusals and finishes.
+ *
+ * <p>Each step is bounded by its own {@code atSetpoint()} finish and internal timeout; callers may still
+ * wrap the whole group in {@code .withTimeout(...)} / {@code .until(driverInput)} per safety §3.
+ */
 public class Stow extends SequentialCommandGroup {
   public Stow(Elevator elevator, Arm arm) {
-    addCommands(arm.goTo(frc.robot.Constants.ArmConstants.kRetracted), elevator.goTo(frc.robot.Constants.ElevatorConstants.kStowHeight));
+    addCommands(
+        arm.goTo(ArmConstants.kRetracted), // H-07 placeholder
+        elevator.goTo(ElevatorConstants.kStowHeight)); // H-03 placeholder
+    setName("Stow");
   }
 }
