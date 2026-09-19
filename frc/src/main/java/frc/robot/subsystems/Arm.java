@@ -54,8 +54,8 @@ import org.littletonrobotics.junction.Logger;
  * RETRACTED (or re-zero there with Back) before extending.
  *
  * <p>Written in the same shape as the Tuner X Elevator generator output so the two subsystems read alike.
- * Units: the TalonFX reports MECHANISM rotations (after SensorToMechanismRatio); extension_m = rot ×
- * {@link ArmConstants#kMetersPerRotation}.
+ * Units: the TalonFX reports MECHANISM (= pulley) rotations after SensorToMechanismRatio; extension_m = rot ×
+ * {@link ArmConstants#kMetersPerRotation} (14T HTD-5 pulley → 0.070 m per revolution).
  */
 public class Arm extends SubsystemBase {
   /** Extension setpoints (metres from the power-on zero, H-07). */
@@ -107,7 +107,7 @@ public class Arm extends SubsystemBase {
           DCMotor.getKrakenX60Foc(1),
           ArmConstants.kSensorToMechanismRatio,
           ArmConstants.kSimCarriageMassKg,
-          kMetersPerRot / (2 * Math.PI), // "drum radius" that gives kMetersPerRot per mechanism rotation
+          kMetersPerRot / (2 * Math.PI), // pulley pitch radius: 0.070 m / 2π = 11.14 mm (14T HTD-5)
           0.0,
           ArmConstants.kMaxExtension.in(Meters),
           false, // no gravity — horizontal axis

@@ -18,13 +18,14 @@ So **feedforward does most of the work and PID only cleans up.** A well-tuned Mo
 small kP and follows the profile almost exactly. If you find yourself needing a huge kP, the FF is wrong.
 
 Units (this matters more than anything): with `SensorToMechanismRatio = 9`, every position/velocity
-the TalonFX reports and every gain is in **mechanism rotations** (one rotation of the pulley = 0.05 m
-of arm travel, H-06). So:
-- kP = **volts per rotation of error** (12 → 1 rot (5 cm) of error asks for 12 V)
+the TalonFX reports and every gain is in **mechanism rotations** = **pulley rotations**. The arm's
+14-tooth HTD-5 pulley moves the belt (and the carriage, since the belt is anchored at both ends)
+14 × 5 mm = **0.070 m per pulley revolution** (`kMetersPerRotation`). So:
+- kP = **volts per rotation of error** (12 → 1 rot (7 cm) of error asks for 12 V)
 - kV = **volts per rotation/second**
 - kS = volts, kG = volts, kA = volts per rot/s²
 - `MotionMagicCruiseVelocity` = rot/s, `MotionMagicAcceleration` = rot/s²
-  (`Constants.ArmConstants` holds these in m/s and m/s² and converts).
+  (`Constants.ArmConstants` holds these in m/s and m/s² and converts: 0.30 m/s = 4.3 rot/s, 1.0 m/s² = 14.3 rot/s²).
 
 ## 2. Why the arm's FF is different from an elevator or a pivot
 | Mechanism | Gravity term |
@@ -44,8 +45,9 @@ a small constant kG is the only thing to add. Never use `Arm_Cosine` for it.
    (`kSoftLimitIn` 0, `kSoftLimitOut` 0.43 m) are measured from this zero — set `kMaxExtension` /
    `kSoftLimitOut` to the real travel (H-06) before any setpoint test.
 3. **Ratio check.** Jog out a known distance (tape measure), read `Arm/position_rot`.
-   `metres ÷ rotations` must equal `kMetersPerRotation` (0.05). If not, fix `kSensorToMechanismRatio`
-   or `kMetersPerRotation` first — every gain below depends on it.
+   `metres ÷ rotations` must equal `kMetersPerRotation` (0.070 — fixed by the 14T HTD-5 pulley). If it
+   comes out as 0.070 × k, then `kSensorToMechanismRatio` (the gearbox between the Kraken and the
+   pulley, placeholder 9) is wrong by that factor k — fix it first; every gain below depends on it.
 4. Keep the stator limit low (60 A) and cruise/accel low for the first runs.
 
 ## 4. Tune in this order (each step ~2 min)
@@ -70,11 +72,11 @@ in Tuner X → Plot.
    0.01–0.05.
 7. **Cruise / accel.** Now raise `kCruiseVelocity` / `kAcceleration` toward what you want
    (`0.30 m/s`, `1.0 m/s²` placeholders → 6 rot/s, 20 rot/s²). Rule of thumb: cruise ≤ 80 % of the
-   free speed you measured in step 2, accel such that it reaches cruise in ~0.2–0.4 s. If it can't
+   free speed you measured in step 2 (at 9:1 that is ≈ 11 rot/s ≈ 0.78 m/s), accel such that it reaches cruise in ~0.2–0.4 s. If it can't
    keep up, the profile is asking for more than kV·v + kA·a can give and the error grows → lower them.
 
 ## 5. What "good" looks like
-- `Position` hugs `ClosedLoopReference` the whole way (error < 0.05 rot ≈ 2.5 mm).
+- `Position` hugs `ClosedLoopReference` the whole way (error < 0.05 rot ≈ 3.5 mm).
 - `MotorVoltage` is a smooth trapezoid, not a saw-tooth (saw-tooth = kP too high / kD missing).
 - Arrives without overshoot; `Arm/atSetpoint` goes true within ~0.2 s of the profile ending.
 - Holding still draws only kS-level voltage (a horizontal axis needs almost nothing to hold).

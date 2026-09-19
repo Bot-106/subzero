@@ -113,11 +113,16 @@ public final class Constants {
     // TODO(hardware) H-05 — arm Kraken X60 CAN id (rio bus). ONE motor, no follower.
     public static final int kCanId = 40;
 
-    // TODO(hardware) H-06 — gear ratio and pulley pitch (m of extension per mechanism rotation), total travel.
     // The arm is a LINEAR axis (3D-printer X carriage), not a pivot: no limit switches; zero = wherever the
     // carriage is at power-on (Back button re-zeroes at the current position). Soft limits are relative to that zero.
+    // Belt drive (measured 2026-09-19): 14-tooth HTD 5 mm pulley, belt anchored at both ends and wrapped over the
+    // pulley → carriage travel = belt surface travel = 14 × 5 mm = 70 mm per PULLEY revolution (no 2:1 reeving).
+    // (Pitch diameter 70/π = 22.28 mm; the sim's "drum radius" kMetersPerRotation/2π = 11.14 mm matches.)
+    public static final Distance kMetersPerRotation = Meters.of(0.070);
+    // TODO(hardware) H-06 — rotor revolutions per PULLEY revolution (gearbox between the Kraken and the 14T pulley).
+    // 9:1 is a placeholder; set 1.0 if the pulley is on the motor shaft (then free speed ≈ 7 m/s — unlikely).
     public static final double kSensorToMechanismRatio = 9.0;
-    public static final Distance kMetersPerRotation = Meters.of(0.05);
+    // TODO(hardware) H-06 — total travel (m) from the retracted zero.
     public static final Distance kMaxExtension = Meters.of(0.45);
     public static final Distance kSoftLimitOut = Meters.of(0.43);
     public static final Distance kSoftLimitIn = Meters.of(0.0);
@@ -140,15 +145,15 @@ public final class Constants {
     // ── MotionMagic + feedforward (see docs/motionmagic-tuning.md). Units: mechanism rotations (after the 9:1).
     // Linear horizontal axis → no gravity term: kG = 0 (GravityType Elevator_Static = constant, so a small
     // kG only if the axis is inclined). TODO(tuning) — all of these are untuned placeholders.
-    public static final double kP = 12.0; // V per mechanism rotation (= per 0.05 m) of error
+    public static final double kP = 12.0; // V per mechanism (pulley) rotation (= per 0.070 m) of error
     public static final double kI = 0.0;
     public static final double kD = 0.0;
     public static final double kS = 0.15; // V to overcome static friction (find with the jog test)
     public static final double kG = 0.0;  // horizontal axis
     public static final double kV = 1.08; // V per mechanism rps: 12 V / (100 rps rotor free speed / 9)
     public static final double kA = 0.0;  // V per mechanism rps²
-    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);      // 6 mech rps
-    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0); // 20 mech rps²
+    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);      // 4.3 pulley rps
+    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0); // 14.3 pulley rps²
     public static final double kGoToTimeoutSeconds = 6.0;
     public static final double kToleranceHoldSeconds = 0.2;
     // TODO(hardware) H-06-adjacent, sim only — real carriage mass.
