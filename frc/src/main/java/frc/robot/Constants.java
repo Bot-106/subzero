@@ -163,6 +163,31 @@ public final class Constants {
     public static final double kSimLoopPeriodSeconds = 0.005;
   }
 
+  // ───────────────────────────── Pincher ──────────────────────────────
+  /** Two micro-servos on the arm carriage that pinch / release a swappable end effector. Driven by the RoboRIO. */
+  public static final class PincherConstants {
+    private PincherConstants() {}
+
+    // TODO(hardware) H-12 — RoboRIO PWM channels (servos MUST be on the PWM header 0–9, not DIO: WPILib's Servo
+    // only drives PWM channels and DIO pins cannot generate servo pulses). Power the servos from a 5–6 V rail.
+    public static final int kJawAPwmChannel = 0;
+    public static final int kJawBPwmChannel = 1;
+
+    // TODO(hardware) H-10 — jaw angles (deg, WPILib Servo.setAngle 0–180). Jaw B is mirrored.
+    public static final double kJawAOpenDeg = 20.0;
+    public static final double kJawAClosedDeg = 110.0;
+    public static final double kJawBOpenDeg = 160.0;
+    public static final double kJawBClosedDeg = 70.0;
+
+    // TODO(hardware) H-10 — jaw gap when fully open (mm); 0 = closed on the tool.
+    public static final double kJawMaxMm = 40.0;
+
+    /** Never slam the jaws: max angle rate (deg/s). */
+    public static final double kSlewDegPerSec = 120.0;
+    /** Gap below which the jaws count as closed / above which they count as open. */
+    public static final double kClosedThresholdMm = 2.0;
+  }
+
   // ─────────────────────────────── Drive ──────────────────────────────
   public static final class DriveConstants {
     private DriveConstants() {}

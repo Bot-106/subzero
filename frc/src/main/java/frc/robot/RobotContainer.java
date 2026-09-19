@@ -19,10 +19,11 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Elevator;
+import frc.robot.subsystems.Pincher;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * M0 hardware configuration (2026-09-19): DRIVETRAIN + ELEVATOR + ARM.
+ * M0 hardware configuration (2026-09-19): DRIVETRAIN + ELEVATOR + ARM + PINCHER.
  *
  * <p>Everything else (RoomCamera, AlignToTagCommand, Stow, SimSequence, tasks/*) is commented out —
  * the full M1 wiring is at git tag {@code m1-sim}.
@@ -30,7 +31,8 @@ import org.littletonrobotics.junction.Logger;
  * <p>Controls: left stick = translate (field-centric), right stick X = rotate; B = zero yaw
  * (seedFieldCentric — current heading becomes "forward"); X = elevator to Ground (6 rot);
  * Y = elevator to Top (7 rot); LB = arm Retracted (0 m); RB = arm Rack (0.15 m); right/left trigger =
- * jog the arm out/in at ≤ 15 % duty; Back = re-zero the arm at its current position. The elevator
+ * jog the arm out/in at ≤ 15 % duty; Back = re-zero the arm at its current position; D-pad down = pinch
+ * (close the jaws on the end effector), D-pad up = release (open). The elevator
  * calibrates its zero (hard stop, −10 % duty) on the first teleop/test enable (A-01); the arm's zero
  * is wherever it sits at power-on (no switch).
  */
@@ -56,6 +58,9 @@ public class RobotContainer {
 
   // ───────────── arm (single Kraken X60, CAN 40, linear axis, no switches) ─────────────
   public final Arm arm = new Arm();
+
+  // ───────────── pincher (two micro-servos on RoboRIO PWM 0/1) ─────────────
+  public final Pincher pincher = new Pincher();
 
   private final CommandXboxController joystick =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
@@ -116,15 +121,21 @@ public class RobotContainer {
     // Back: re-zero the arm at its current position (do this fully retracted before extending).
     joystick.back().onTrue(arm.zeroHere());
 
+    // Pincher: D-pad down = pinch (close on the end effector), D-pad up = release (open). Slew-limited.
+    joystick.povDown().onTrue(pincher.pinch());
+    joystick.povUp().onTrue(pincher.release());
+
     // Sim self-test (agents): SUBZERO_SIM_ARM_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless
-    // → arm to Rack for 2 s, then Retracted; read Arm/* in frc/logs/akit_*.wpilog.
+    // → arm to Rack for 2 s, then Retracted, then pincher pinch → release; read Arm/* and Pincher/* in frc/logs/akit_*.wpilog.
     if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_ARM_TEST") != null) {
       new Trigger(DriverStation::isEnabled)
           .onTrue(
               Commands.sequence(
                       Commands.waitSeconds(0.5),
                       arm.goToSetpoint(() -> Arm.Setpoint.Rack).withTimeout(2.0),
-                      arm.goToSetpoint(() -> Arm.Setpoint.Retracted).withTimeout(2.0))
+                      arm.goToSetpoint(() -> Arm.Setpoint.Retracted).withTimeout(2.0),
+                      pincher.pinch().withTimeout(2.0),
+                      pincher.release().withTimeout(2.0))
                   .withName("SimArmTest"));
     }
 

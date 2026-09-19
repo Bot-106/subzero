@@ -6,8 +6,7 @@ profiles:
     # planned values, unconfirmed). Placeholders fail safe: an unreachable tool is simply reported
     # online=false and no command is acknowledged.
     tools:
-      0: "10.13.60.30"   # TODO(hardware) H-13 — PINCHER on the arm (2 servos; /latch = pinch, /release = open, /lateral = jaw gap mm)
-      1: "10.13.60.31"   # TODO(hardware) H-13 — end effector 1 (DRV8833 DC motor + pot = emulated servo)
+      1: "10.13.60.31"   # TODO(hardware) H-13 — end effector 1 (DRV8833 DC motor, timed open-loop runs)
       2: "10.13.60.32"   # TODO(hardware) H-13 — end effector 2
       3: "10.13.60.33"   # TODO(hardware) H-13 — end effector 3 (slot reserved)
     nt_server: "10.13.60.2"          # RoboRIO (H-13); --server overrides
@@ -15,7 +14,6 @@ profiles:
     wifi_psk: "TODO_H13_PSK"         # TODO(hardware) H-13: radio passphrase unknown
   mock:
     tools:
-      0: "127.0.0.1:8030"            # `uv run python mock_tool.py --port 8030 --tool 0` (pincher stand-in)
       1: "127.0.0.1:8031"            # `uv run python mock_tool.py --port 8031 --tool 1`
     nt_server: "127.0.0.1"           # WPILib sim NT4 server, port 5810
 timings:
