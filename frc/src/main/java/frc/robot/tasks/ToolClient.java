@@ -53,7 +53,7 @@ public class ToolClient {
   public ToolClient(NetworkTableInstance inst) {
     cmdPub =
         inst.getStringTopic("/subzero/tool/cmd")
-            .publish(PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02));
+            .publish(PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02), PubSubOption.sendAll(true));
     lastSeqSubs = new IntegerSubscriber[TaskConstants.kToolIdCount + 1];
     for (int id = 1; id <= TaskConstants.kToolIdCount; id++) {
       lastSeqSubs[id] = inst.getIntegerTopic("/subzero/tool/" + id + "/lastSeq").subscribe(0);

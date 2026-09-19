@@ -80,10 +80,10 @@ public class TaskNtBridge extends SubsystemBase {
 
     requestSub =
         inst.getStringTopic("/subzero/task/request")
-            .subscribe("", PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02));
+            .subscribe("", PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02), PubSubOption.sendAll(true), PubSubOption.pollStorage(64));
     statePub =
         inst.getStringTopic("/subzero/task/state")
-            .publish(PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02));
+            .publish(PubSubOption.keepDuplicates(true), PubSubOption.periodic(0.02), PubSubOption.sendAll(true));
     homedPub = inst.getBooleanTopic("/subzero/robot/homed").publish();
     heightPub = inst.getDoubleTopic("/subzero/elevator/height_m").publish();
     extensionPub = inst.getDoubleTopic("/subzero/arm/extension_m").publish();

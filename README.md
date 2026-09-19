@@ -6,11 +6,11 @@ An FRC-style swerve robot with a 1.5 m elevator, an extending arm and WiFi servo
 
 | Item | Status | Evidence |
 |---|---|---|
-| `frc/` builds (`cd frc && ./gradlew build`) | **passes** | exit 0 at commit `74667b0` (tag `m1-sim`) |
+| `frc/` builds (`cd frc && ./gradlew build`) | **passes** | exit 0 at tag `m1-sim` |
 | Headless sim runs auto-enabled (`SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless`) | **passes** | "Robot program startup complete", no GUI, AK log written |
-| Acceptance 1 — sim `alignToTag(3)` < 3 cm / 2° from 1.5 m within 5 s | **passes in sim** | `frc/logs/akit_26-09-19_02-33-08.wpilog`: `Align/error_m` 1.500 → 0.0144, `error_deg` 20.0 → 0.012, `SimSequence/align/seconds` 3.64, `refused` false; start (4.9, 4.35, 110°) → target (4.0, 5.55, 90°) |
+| Acceptance 1 — sim `alignToTag(3)` < 3 cm / 2° from 1.5 m within 5 s | **passes in sim** | `frc/logs/akit_26-09-19_02-35-26.wpilog`: `Align/error_m` 1.500 → 0.0143, `error_deg` 20.0 → 0.012, `SimSequence/align/seconds` 3.66, `refused` false; start (4.9, 4.35, 110°) → target (4.0, 5.55, 90°) |
 | Acceptance 2 — sim `elevatorTo(0.8)`, `armTo(0.3)` within tolerance, no soft-limit crossing; homing sets zero | **passes in sim** | same log: `Elevator/homed` true @1.1 s, `Arm/homed` true @2.0 s (switch path); `SimSequence/elevator/error` 0.0002 m, `maxHeight_m` 0.802 < 1.15; `SimSequence/arm/error` 0.0002 m, `maxExtension_m` 0.300 < 0.43; `Stow` ends at 0.050 / 0.000 m |
-| Acceptance 3 — bridge ↔ `mock_tool.py`: ack < 300 ms, link-loss → `online=false` ≤ 1.5 s | **passes** | `cd integration && uv run pytest -q` → `49 passed`; measured round-trip 65.6 ms, link loss 981 ms, ESTOP fan-out 43.9 ms. **Live against the robot sim** (127.0.0.1:5810): `/subzero/task/request` `toolOp latch` → `task/state` RUNNING +58 ms, DONE +86 ms; bridge log `tool 1: latch seq 1 acked`, `/subzero/tool/1/lastSeq` 0 → 1; `elevatorTo 0.5` from rest → DONE +975 ms at 0.5002 m |
+| Acceptance 3 — bridge ↔ `mock_tool.py`: ack < 300 ms, link-loss → `online=false` ≤ 1.5 s | **passes** | `cd integration && uv run pytest -q` → `49 passed`; measured round-trip 65.6 ms, link loss 981 ms, ESTOP fan-out 43.9 ms. **Live against the robot sim** (127.0.0.1:5810): `/subzero/task/request` `toolOp latch` → `task/state` RUNNING +58 ms, DONE +115 ms; bridge log `tool 1: latch seq 1 acked`, `/subzero/tool/1/lastSeq` 0 → 1; `elevatorTo 0.5` from rest → DONE +996 ms at 0.5002 m |
 | ESP32 firmware (`cd esp32 && pio run -e esp32-s3-devkitc-1`) | **builds** | exit 0; RAM 14.2 % (46516 B), Flash 29.0 % (967806 B); `[env:tool2]` also builds |
 | Jetson runbook scripts (`bash -n jetson/gst/*.sh`) | **passes** | exit 0; no pack references |
 | Room layout validator (`uv run --project integration python docs/validate_layout.py docs/room-layout.template.json`) | **passes** | exit 0, 4 tags valid; exit 1 on a broken copy |
