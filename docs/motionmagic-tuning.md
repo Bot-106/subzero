@@ -17,8 +17,9 @@ V = kS·sign(v_target) + kV·v_target + kA·a_target + kG          ← feedforwa
 So **feedforward does most of the work and PID only cleans up.** A well-tuned MotionMagic axis has a
 small kP and follows the profile almost exactly. If you find yourself needing a huge kP, the FF is wrong.
 
-Units (this matters more than anything): with `SensorToMechanismRatio = 9`, every position/velocity
-the TalonFX reports and every gain is in **mechanism rotations** = **pulley rotations**. The arm's
+Units (this matters more than anything): the pulley is directly on the Kraken's spline shaft
+(`SensorToMechanismRatio = 1`), so every position/velocity the TalonFX reports and every gain is in
+**pulley rotations = rotor rotations**. The arm's
 14-tooth HTD-5 pulley moves the belt (and the carriage, since the belt is anchored at both ends)
 14 × 5 mm = **0.070 m per pulley revolution** (`kMetersPerRotation`). So:
 - kP = **volts per rotation of error** (12 → 1 rot (7 cm) of error asks for 12 V)
@@ -45,9 +46,8 @@ a small constant kG is the only thing to add. Never use `Arm_Cosine` for it.
    (`kSoftLimitIn` 0, `kSoftLimitOut` 0.43 m) are measured from this zero — set `kMaxExtension` /
    `kSoftLimitOut` to the real travel (H-06) before any setpoint test.
 3. **Ratio check.** Jog out a known distance (tape measure), read `Arm/position_rot`.
-   `metres ÷ rotations` must equal `kMetersPerRotation` (0.070 — fixed by the 14T HTD-5 pulley). If it
-   comes out as 0.070 × k, then `kSensorToMechanismRatio` (the gearbox between the Kraken and the
-   pulley, placeholder 9) is wrong by that factor k — fix it first; every gain below depends on it.
+   `metres ÷ rotations` must equal `kMetersPerRotation` (0.070 — fixed by the 14T HTD-5 pulley on the
+   motor shaft). If it doesn't, the belt is slipping or the pulley isn't 14T — fix that first.
 4. Keep the stator limit low (60 A) and cruise/accel low for the first runs.
 
 ## 4. Tune in this order (each step ~2 min)
@@ -56,10 +56,12 @@ Log `Arm/position_rot`, `Arm/setpoint_m`, `Arm/velocity_mps`, `Arm/appliedVolts`
 in Tuner X → Plot.
 
 1. **kS (static friction).** Set kP = kV = 0. Jog with the trigger and note the smallest duty that
-   just starts moving, ×12 V → kS (typically 0.1–0.3 V; current placeholder 0.15). Same both ways?
+   just starts moving, ×12 V → kS (typically 0.1–0.4 V; placeholder 0.20 — direct drive has no gearbox
+   to multiply torque, so carriage friction shows up 1:1 and kS tends to be on the higher side). Same both ways?
    If very different, the rail is tilted → that difference/2 is your kG.
-2. **kV (velocity).** Theory: Kraken X60 free speed ≈ 100 rot/s at 12 V at the rotor →
-   mechanism 100/9 ≈ 11 rot/s → kV ≈ 12/11 ≈ **1.08 V per rot/s** (placeholder). Verify: command a
+2. **kV (velocity).** Theory: Kraken X60 free speed ≈ 100 rot/s at 12 V, and the pulley is on the
+   rotor → kV ≈ 12/100 = **0.12 V per rot/s** (placeholder). Direct drive means the unloaded axis could
+   do 100 rot/s × 0.07 m = 7 m/s — never let the profile ask for that; cruise stays ≤ ~1 m/s. Verify: command a
    move with kP still 0; during the cruise part `velocity` should sit near the profile's cruise. Lower
    than target → raise kV; overshooting/running fast → lower it. Loaded mechanisms usually land
    5–15 % above theory.
@@ -72,7 +74,8 @@ in Tuner X → Plot.
    0.01–0.05.
 7. **Cruise / accel.** Now raise `kCruiseVelocity` / `kAcceleration` toward what you want
    (`0.30 m/s`, `1.0 m/s²` placeholders → 6 rot/s, 20 rot/s²). Rule of thumb: cruise ≤ 80 % of the
-   free speed you measured in step 2 (at 9:1 that is ≈ 11 rot/s ≈ 0.78 m/s), accel such that it reaches cruise in ~0.2–0.4 s. If it can't
+   free speed you measured in step 2 — but for this direct-drive axis cap cruise at ~1 m/s (14 rot/s)
+   regardless; accel such that it reaches cruise in ~0.2–0.4 s. If it can't
    keep up, the profile is asking for more than kV·v + kA·a can give and the error grows → lower them.
 
 ## 5. What "good" looks like
@@ -82,7 +85,9 @@ in Tuner X → Plot.
 - Holding still draws only kS-level voltage (a horizontal axis needs almost nothing to hold).
 
 ## 6. Gotchas
-- **Changed the ratio? Re-tune kV/kP** — they are in mechanism rotations.
+- **Direct drive, no gearbox:** the motor has no torque multiplication, so kP's authority is lower than
+  on a geared axis and the 60 A stator cap (≈ 105 N of belt force) is what keeps a jam safe. If you ever
+  add a reduction, set `kSensorToMechanismRatio` and re-tune kV/kP — they are per mechanism rotation.
 - kP is applied to *profile* error, not to the distance to the final target, so a big kP does not make
   the move faster — cruise/accel do. Raise those, not kP, for speed.
 - `MotionMagicExpoVoltage` is the alternative profile that derives its shape from kV/kA

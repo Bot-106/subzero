@@ -119,9 +119,11 @@ public final class Constants {
     // pulley → carriage travel = belt surface travel = 14 × 5 mm = 70 mm per PULLEY revolution (no 2:1 reeving).
     // (Pitch diameter 70/π = 22.28 mm; the sim's "drum radius" kMetersPerRotation/2π = 11.14 mm matches.)
     public static final Distance kMetersPerRotation = Meters.of(0.070);
-    // TODO(hardware) H-06 — rotor revolutions per PULLEY revolution (gearbox between the Kraken and the 14T pulley).
-    // 9:1 is a placeholder; set 1.0 if the pulley is on the motor shaft (then free speed ≈ 7 m/s — unlikely).
-    public static final double kSensorToMechanismRatio = 9.0;
+    // H-06 (resolved 2026-09-19): the 14T pulley sits DIRECTLY on the Kraken's spline shaft — no gearbox.
+    // 1 rotor rev = 1 pulley rev = 0.070 m. Free speed ≈ 100 rps ≈ 7 m/s (!) — the MotionMagic profile is the
+    // only thing limiting speed, so keep kCruiseVelocity modest. At the 60 A stator cap the belt force is
+    // ≈ 1.16 N·m / 11.14 mm ≈ 105 N (~10 kgf): enough for the carriage, still a sane pinch limit.
+    public static final double kSensorToMechanismRatio = 1.0;
     // TODO(hardware) H-06 — total travel (m) from the retracted zero.
     public static final Distance kMaxExtension = Meters.of(0.45);
     public static final Distance kSoftLimitOut = Meters.of(0.43);
@@ -142,15 +144,15 @@ public final class Constants {
 
     public static final Distance kTolerance = Meters.of(0.02);
 
-    // ── MotionMagic + feedforward (see docs/motionmagic-tuning.md). Units: mechanism rotations (after the 9:1).
+    // ── MotionMagic + feedforward (see docs/motionmagic-tuning.md). Units: pulley = rotor rotations (direct drive).
     // Linear horizontal axis → no gravity term: kG = 0 (GravityType Elevator_Static = constant, so a small
     // kG only if the axis is inclined). TODO(tuning) — all of these are untuned placeholders.
     public static final double kP = 12.0; // V per mechanism (pulley) rotation (= per 0.070 m) of error
     public static final double kI = 0.0;
     public static final double kD = 0.0;
-    public static final double kS = 0.15; // V to overcome static friction (find with the jog test)
+    public static final double kS = 0.20; // V to overcome static friction (direct drive → carriage friction is felt 1:1; find with the jog test)
     public static final double kG = 0.0;  // horizontal axis
-    public static final double kV = 1.08; // V per mechanism rps: 12 V / (100 rps rotor free speed / 9)
+    public static final double kV = 0.12; // V per pulley rps: 12 V / 100 rps (Kraken X60 free speed, direct drive)
     public static final double kA = 0.0;  // V per mechanism rps²
     public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);      // 4.3 pulley rps
     public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0); // 14.3 pulley rps²
