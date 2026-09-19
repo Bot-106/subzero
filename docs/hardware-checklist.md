@@ -86,6 +86,16 @@ encodes `00-brief/safety.md` items 2, 6, 8, 9 explicitly (marked below) and
 | H-25 | Servo stall current → buck/LiPo rating | 2.5 A/servo @ 6 V, ≥ 5 A buck | `esp32/include/config.h` |
 | H-26 | DevKitC-1 revision: v1.0 RGB GPIO48 / v1.1 GPIO38 | default v1.0 | `esp32/include/config.h` (`STATUS_LED_PIN`) |
 
+## Before first power-on — findings from the sim session (2026-09-19)
+
+- [ ] **Elevator follower direction (H-02-adjacent).** `Elevator.java` uses the Tuner X generated `Follower(leader, MotorAlignmentValue.Opposed)`. Confirm the second motor is physically opposed before first power-on — a wrong flag stalls both motors against each other at the 80 A stator cap.
+- [ ] **Homing direction signs.** `ElevatorConstants.kHomingDutyCycle` and `ArmConstants.kHomingDutyCycle` are −0.08. On the robot, negative MUST mean elevator *down* / arm *retract*. Verify with a spotter and the DS ready to disable on the first enable (safety §4, §6).
+- [ ] **Homing runs on the first teleop/test enable (A-01):** expect the arm to retract, then the elevator to drive down at ≤ 10 % duty, each with a timeout. If either times out, `isHomed()` stays false and every `elevatorTo`/`armTo`/composite refuses (prints "refused … not homed"). `/subzero/robot/homed` shows the state.
+- [ ] **Field-centric heading:** a DS with no FMS defaults to the Red perspective, so field-forward = 180° until the driver presses **Start** (`seedFieldCentric`). Do this once at the start pose.
+- [ ] **Vision first fix:** the drivetrain accepts the first vision estimate unconditionally (later ones are gated at 0.5 m). Expect one odometry jump when a tag is first seen — intended.
+- [ ] **Camera aim (H-14):** the placeholder mounts are the 2025 chassis' (±45° yaw). The sim used a 120° FOV; a real ~60° camera on those mounts may not see the tag from a 20°-yawed start. `alignToTag` then refuses ("leash") rather than moving — re-aim the mounts and update `VisionConstants.kRobotTo*Camera`.
+- [ ] **Known-good commit:** deploy from tag `m1-sim` (`git checkout m1-sim`), not from an untested HEAD.
+
 ---
 
 ## Deploy notes
