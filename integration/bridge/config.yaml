@@ -1,0 +1,24 @@
+# Subzero bridge config (contracts v0). Only tool ids listed under a profile are polled (H-09: 2 tools
+# on the robot; 3 slots reserved). Every TODO(hardware) constant for the bridge lives in THIS file.
+profiles:
+  real:
+    # TODO(hardware) H-13: tool static IPs on the robot radio subnet (10.13.60.31/.32/.33 are the
+    # planned values, unconfirmed). Placeholders fail safe: an unreachable tool is simply reported
+    # online=false and no command is acknowledged.
+    tools:
+      1: "10.13.60.31"   # TODO(hardware) H-13
+      2: "10.13.60.32"   # TODO(hardware) H-13
+      3: "10.13.60.33"   # TODO(hardware) H-13
+    nt_server: "10.13.60.2"          # RoboRIO (H-13); --server overrides
+    wifi_ssid: "TODO_H13_SSID"       # TODO(hardware) H-13: radio 2.4 GHz SSID unknown (informational; the bridge does not join WiFi itself)
+    wifi_psk: "TODO_H13_PSK"         # TODO(hardware) H-13: radio passphrase unknown
+  mock:
+    tools:
+      1: "127.0.0.1:8031"            # `uv run python mock_tool.py --port 8031 --tool 1`
+    nt_server: "127.0.0.1"           # WPILib sim NT4 server, port 5810
+timings:
+  heartbeat_ms: 200        # C.2: bridge POSTs /heartbeat every 200 ms
+  request_timeout_ms: 500  # C.2: client timeout per request
+  retries: 3               # C.2: 3 retries ...
+  backoff_ms: 100          # C.2: ... with 100 ms backoff
+  offline_after_ms: 1000   # online=false once failures span >= 1000 ms (false within 1.5 s of link loss)
