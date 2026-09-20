@@ -40,14 +40,14 @@ CAD/     mechanical design — source, exports, drawings, BOM
 
 - `commands/Superstructure.java`: `setEndpointPosition(armExtension, elevatorHeight)` moves both mechanisms together (done when both settle; 0.75 m/s caps stay in the subsystems); `grabFromCarousel(slot)` = align (arm `kPreGrabArmPosition`, elevator at the slot height) → arm to `kAttachmentPinchPosition` → [pinch dwell] → elevator up `kPostPinchElevatorRaiseHeight` → arm back → elevator to `kCarouselClearHeight`; `dockToCarousel(slot)` = align at slot + offset → arm extends → elevator drops → [un-pinch dwell] → arm pulls back. Every step requires its subsystem, so a new sequence interrupts the running one and the hold defaults take over.
 - `CarouselConstants.java` (all mock, `TODO(hardware) H-08`): `CarouselSlot.LEVEL_1` 0.30 m / `LEVEL_2` 0.60 m, pre-grab arm 0.02 m, pinch position 0.25 m, post-pinch raise 0.06 m, clear height 0.80 m (≤ the 0.84 m elevator cap), pinch dwell 0.5 s.
-- **Bindings:** **A** = dock LEVEL_1 · **B** = dock LEVEL_2 · **X** = dock LEVEL_1 then grab LEVEL_2 · D-pad **up/down** = elevator ±1 in · D-pad **right/left** = arm ±1 in · **Start** = zero yaw. Sequences are gated on the first-enable calibration having finished.
+- **Bindings:** **A** = dock LEVEL_1 · **B** = dock LEVEL_2 · **X** = dock LEVEL_1 then grab LEVEL_2 · D-pad **up/down** = elevator ±1 in · D-pad **right/left** = arm ±1 in · **Menu (☰)** = reset gyro / zero yaw. Sequences are gated on the first-enable calibration having finished.
 - Sim proof (`SUBZERO_SIM_CAROUSEL_TEST=1`, `frc/logs/akit_26-09-20_04-54-52.wpilog`): dock L1 → (0.36, 0.02) → arm 0.25 → elevator 0.30 → arm 0.02; grab L2 → (0.60, 0.02) → arm 0.25 → elevator 0.66 → arm 0.02 → elevator 0.80; 8 s total; peaks 0.80 m/s elevator / 0.67 m/s arm.
 
 ## Previous step (tag `jog-control`): incremental (1-inch) control
 
 - **Elevator** (CTREELEVATOR config; MotionMagic cruise capped to **0.75 m/s** = 6.25 rps, accel 3 m/s²): the default command holds a persistent target; **X / Y = target +1 in / −1 in**, clamped to [0, 7 rot = 0.84 m]; `calibrateZero` on the first enable resets the target to 0. (Deviation from the reference file: hold-target default instead of `manualDrive(0)`; `kMaxHeight` 1.0 m for the sim only.)
 - **Arm** (single Kraken, 14T HTD-5 direct drive, no switches; cruise **0.75 m/s**, accel 1.5 m/s²): **A / B = target +1 in / −1 in**, clamped to the soft limits [0, 0.43 m]; zero = power-on position.
-- **Start** = zero yaw (moved from B). Pincher remains disabled in `RobotContainer`.
+- **Menu (☰)** = reset gyro / zero yaw (moved from B). Pincher remains disabled in `RobotContainer`.
 - Sim proof (`SUBZERO_SIM_JOG_TEST=1`, `frc/logs/akit_26-09-20_04-34-04.wpilog`): elevator target 0.025 → 0.051 → 0.076 → 0.102 → 0.076 → 0.051 m with the carriage following (peak 0.28 m/s), arm 0.025 → 0.051 → 0.076 → 0.051 m (peak 0.23 m/s); jogs are requirement-free so they never interrupt the hold or the first-enable calibration.
 
 ## Vision prototyping (tag `vision-proto`) — localization

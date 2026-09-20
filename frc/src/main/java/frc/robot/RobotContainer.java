@@ -108,7 +108,7 @@ public class RobotContainer {
 
     RobotModeTriggers.disabled().whileTrue(drivetrain.applyRequest(() -> idle).ignoringDisable(true));
 
-    // Start: zero yaw — the current heading becomes field-forward (toward the FRONT wall). (Was B; B is now the arm.)
+    // MENU (☰, WPILib "start", button 8): reset gyro / zero yaw — the current heading becomes field-forward (front wall).
     joystick.start().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric).withName("ZeroYaw"));
 
     // Elevator: calibrate zero on the FIRST teleop/test enable (A-01), never while disabled.
