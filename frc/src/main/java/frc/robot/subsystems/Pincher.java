@@ -3,34 +3,29 @@ package frc.robot.subsystems;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.networktables.DoubleEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.wpilibj.DigitalOutput;
+import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.PincherConstants;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * Two pinch micro-servos driven from RoboRIO DIO 8 / DIO 9 (NOT the PWM header) using the FPGA's DIO PWM
- * generator ({@link DigitalOutput#enablePWM}). 50 Hz, 0.5–2.5 ms pulses = 0–180°.
+ * Two pinch micro-servos on RoboRIO PWM header channels 8 / 9 (WPILib {@link Servo}: dedicated FPGA servo PWM,
+ * ~1 µs pulse resolution ≈ 0.1°). Pulse range {@link PincherConstants#kServoMinPulseUs}–{@link
+ * PincherConstants#kServoMaxPulseUs} = 0–180°.
  *
  * <p>SERVO-ANGLE TEST MODE (2026-09-20): the target angles are read live from NetworkTables every loop —
  * {@code /SmartDashboard/Pincher/servoA_deg} and {@code /SmartDashboard/Pincher/servoB_deg} (0–180, default
  * 90) — so any dashboard (AdvantageScope tuning mode, Elastic, Shuffleboard) can set them and the servos follow.
- * What is actually generated is logged as {@code Pincher/servoA_pulse_us} / {@code servoA_duty} etc.
+ * What is actually generated is logged as {@code Pincher/servoA_pulse_us} etc.
  *
- * <p>Resolution caveat: the DIO PWM duty cycle is 8-bit at ≤ 1 kHz, i.e. 256 steps per 20 ms period = 78 µs per
- * step → the 2 ms servo span is ~26 steps ≈ 7° per step. Good enough to find open/closed angles; if finer control is
- * needed later, move the servos to the PWM header and use {@code edu.wpi.first.wpilibj.Servo}.
- *
- * <p>Power: the DIO header's 5 V pins come from the RoboRIO's own regulator — fine for two idle micro-servos,
- * but a stalled servo can brown the rail out. A dedicated 5–6 V rail with common ground is the robust option.
+ * <p>Power: the PWM header's +5 V pins come from the RoboRIO's own regulator — fine for two idle micro-servos,
+ * but a stalled servo can brown the rail out. A dedicated 5–6 V rail with common ground is the robust option
+ * (signal stays on PWM 8/9).
  */
 public class Pincher extends SubsystemBase {
-  private static final double kPwmHz = 50.0;
-  private static final double kPeriodUs = 1e6 / kPwmHz;
-
-  private final DigitalOutput jawA = new DigitalOutput(PincherConstants.kJawADioChannel);
-  private final DigitalOutput jawB = new DigitalOutput(PincherConstants.kJawBDioChannel);
+  private final Servo jawA = new Servo(PincherConstants.kJawAPwmChannel);
+  private final Servo jawB = new Servo(PincherConstants.kJawBPwmChannel);
 
   private final DoubleEntry servoAEntry;
   private final DoubleEntry servoBEntry;
@@ -39,10 +34,14 @@ public class Pincher extends SubsystemBase {
   private double angleBDeg = 90.0;
 
   public Pincher() {
-    // One PWM rate for every DIO PWM output on the RoboRIO (valid 0.6 Hz … 19 kHz).
-    jawA.setPWMRate(kPwmHz);
-    jawA.enablePWM(dutyFor(angleADeg));
-    jawB.enablePWM(dutyFor(angleBDeg));
+    // Map 0–180° onto the configured pulse range (WPILib's default is the same 0.5–2.5 ms; kept explicit + tunable).
+    final int min = (int) PincherConstants.kServoMinPulseUs;
+    final int max = (int) PincherConstants.kServoMaxPulseUs;
+    final int center = (min + max) / 2;
+    jawA.setBoundsMicroseconds(max, center, center, center, min);
+    jawB.setBoundsMicroseconds(max, center, center, center, min);
+    setAngleA(angleADeg);
+    setAngleB(angleBDeg);
 
     var table = NetworkTableInstance.getDefault().getTable("SmartDashboard").getSubTable("Pincher");
     servoAEntry = table.getDoubleTopic("servoA_deg").getEntry(angleADeg);
@@ -51,26 +50,22 @@ public class Pincher extends SubsystemBase {
     servoBEntry.set(angleBDeg);
   }
 
-  /** Servo pulse width for an angle: 0° → kServoMinUs, 180° → kServoMaxUs (linear). */
+  /** Servo pulse width for an angle: 0° → kServoMinPulseUs, 180° → kServoMaxPulseUs (linear). */
   private static double pulseUsFor(double deg) {
     final double t = MathUtil.clamp(deg, 0.0, 180.0) / 180.0;
     return PincherConstants.kServoMinPulseUs + t * (PincherConstants.kServoMaxPulseUs - PincherConstants.kServoMinPulseUs);
   }
 
-  private static double dutyFor(double deg) {
-    return pulseUsFor(deg) / kPeriodUs;
-  }
-
   /** Directly command servo A (0–180°). */
   public void setAngleA(double deg) {
     angleADeg = MathUtil.clamp(deg, 0.0, 180.0);
-    jawA.updateDutyCycle(dutyFor(angleADeg));
+    jawA.setAngle(angleADeg);
   }
 
   /** Directly command servo B (0–180°). */
   public void setAngleB(double deg) {
     angleBDeg = MathUtil.clamp(deg, 0.0, 180.0);
-    jawB.updateDutyCycle(dutyFor(angleBDeg));
+    jawB.setAngle(angleBDeg);
   }
 
   public double getAngleA() {
@@ -81,7 +76,7 @@ public class Pincher extends SubsystemBase {
     return angleBDeg;
   }
 
-  /** Both servos to explicit angles (for later choreography). */
+  /** Both servos to explicit angles (for later choreography); also updates the dashboard entries. */
   public Command setAngles(double aDeg, double bDeg) {
     return runOnce(
             () -> {
@@ -101,7 +96,7 @@ public class Pincher extends SubsystemBase {
     Logger.recordOutput("Pincher/servoB_deg", angleBDeg);
     Logger.recordOutput("Pincher/servoA_pulse_us", pulseUsFor(angleADeg));
     Logger.recordOutput("Pincher/servoB_pulse_us", pulseUsFor(angleBDeg));
-    Logger.recordOutput("Pincher/servoA_duty", dutyFor(angleADeg));
-    Logger.recordOutput("Pincher/servoB_duty", dutyFor(angleBDeg));
+    Logger.recordOutput("Pincher/servoA_hw_pulse_us", jawA.getPulseTimeMicroseconds());
+    Logger.recordOutput("Pincher/servoB_hw_pulse_us", jawB.getPulseTimeMicroseconds());
   }
 }

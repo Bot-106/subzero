@@ -170,11 +170,11 @@ public final class Constants {
   public static final class PincherConstants {
     private PincherConstants() {}
 
-    // H-12 (2026-09-20): the two pinch servos are wired to RoboRIO DIO 8 and DIO 9 and driven with the FPGA's
-    // DIO PWM generator (DigitalOutput.enablePWM, 50 Hz, ~7° resolution). Signal is 3.3 V logic; power the servos
-    // from a 5–6 V rail with a common ground if the DIO 5 V pins prove marginal.
-    public static final int kJawADioChannel = 8;
-    public static final int kJawBDioChannel = 9;
+    // H-12 (2026-09-20): the two pinch servos are on RoboRIO PWM header channels 8 and 9 (WPILib Servo — dedicated
+    // FPGA servo PWM, ~0.1° resolution; the DIO-PWM version had ~7° steps). Signal is 3.3 V logic; power the servos
+    // from a 5–6 V rail with a common ground if the header's 5 V pins prove marginal.
+    public static final int kJawAPwmChannel = 8;
+    public static final int kJawBPwmChannel = 9;
     /** Pulse width at 0° / 180°. TODO(hardware) H-10 — trim if a servo buzzes at either end (typical 500–2500 µs). */
     public static final double kServoMinPulseUs = 500.0;
     public static final double kServoMaxPulseUs = 2500.0;

@@ -75,7 +75,7 @@ public class RobotContainer {
   public final Superstructure superstructure = new Superstructure(elevator, arm);
   private static final edu.wpi.first.units.measure.Distance kJogStep = Inches.of(1.0);
 
-  // ───────────── pincher servos on DIO 8/9 — SERVO-ANGLE TEST MODE ─────────────
+  // ───────────── pincher servos on PWM 8/9 — SERVO-ANGLE TEST MODE ─────────────
   // Angles follow NetworkTables /SmartDashboard/Pincher/servoA_deg and servoB_deg (0–180) every loop; no buttons.
   public final Pincher pincher = new Pincher();
 

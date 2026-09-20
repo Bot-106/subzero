@@ -12,9 +12,9 @@ esp32/   endeffector/       one ESP32-S3 per end effector: DRV8833 DC motor, tim
 CAD/     mechanical design — source, exports, drawings, BOM
 ```
 
-## Current HEAD (tag `servo-test`): pinch-servo angle test on DIO 8/9
+## Current HEAD (tag `servo-test`): pinch-servo angle test on PWM 8/9
 
-- `subsystems/Pincher.java` now drives the two micro-servos from **RoboRIO DIO 8 / DIO 9** with the FPGA DIO PWM generator (`DigitalOutput.enablePWM`, 50 Hz, 0.5–2.5 ms = 0–180°; ~7° resolution). **Test mode:** every loop it follows NetworkTables `/SmartDashboard/Pincher/servoA_deg` and `servoB_deg` (0–180, default 90) — set them from AdvantageScope (NetworkTables tab → tuning mode), Elastic or Shuffleboard and watch the servos. Logged: `Pincher/servo{A,B}_{deg,pulse_us,duty}`. Sim-verified: NT 90/0/45/180/90 → 1500/500/1000/2500/1500 µs.
+- `subsystems/Pincher.java` drives the two micro-servos from **RoboRIO PWM header channels 8 / 9** with WPILib `Servo` (dedicated FPGA servo PWM, ~0.1° resolution; 0.5–2.5 ms = 0–180°, `PincherConstants.kServoMin/MaxPulseUs`). (The earlier DIO 8/9 `DigitalOutput.enablePWM` version had ~7° steps — in git history at `5fda487`.) **Test mode:** every loop it follows NetworkTables `/SmartDashboard/Pincher/servoA_deg` and `servoB_deg` (0–180, default 90) — set them from AdvantageScope (NetworkTables tab → tuning mode), Elastic or Shuffleboard and watch the servos. Logged: `Pincher/servo{A,B}_{deg,pulse_us,duty}`. Sim-verified: NT 90/0/45/180/90 → 1500/500/1000/2500/1500 µs.
 - Carousel choreography below is unchanged (pinch steps are still dwells; wire `pincher.setAngles(...)` in once the open/closed angles are known).
 
 ## Carousel grab / dock choreography (tag `carousel-demo`)
