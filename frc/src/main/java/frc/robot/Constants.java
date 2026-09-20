@@ -211,7 +211,9 @@ public final class Constants {
     public static final LinearVelocity kAutoMaxSpeed = MetersPerSecond.of(1.0);
     public static final AngularVelocity kAutoMaxAngularRate = DegreesPerSecond.of(90);
     public static final double kAutoMaxAccelMps2 = 1.5;
-    public static final double kTeleopScalar = 0.1;
+    /** Teleop scalars (2026-09-20: translation doubled 0.1 → 0.2 = 0.95 m/s; rotation tripled 0.1 → 0.3 = 0.225 rot/s ≈ 81 °/s). */
+    public static final double kTeleopScalar = 0.2;
+    public static final double kTeleopRotationScalar = 0.3;
 
     /** alignToTag tolerance + leash (safety §7). */
     public static final Distance kAlignTolerance = Meters.of(0.03);
@@ -385,6 +387,9 @@ public final class Constants {
     public static final int kDriverControllerPort = 0;
     // TODO(hardware) H-21 — driver mapping: A=alignToTag(nearest), B=stow, X=toolLatch, Y=toolRelease.
     public static final double kStickDeadband = 0.1;
+    /** D-pad continuous jog rates (m/s) for the elevator and arm targets. */
+    public static final double kElevatorJogRateMps = 0.15;
+    public static final double kArmJogRateMps = 0.15;
     /** Any stick input above this interrupts an automated command (safety §3). */
     public static final double kDriverInterruptThreshold = 0.15;
   }

@@ -72,13 +72,13 @@ public class Elevator extends SubsystemBase {
     /** Speed cap requested 2026-09-20: ~0.75 m/s cruise, gentle accel. */
     private static final double kCruiseRps = 0.75 / kMetersPerRot;   // 6.25 rot/s
     private static final double kAccelRps2 = 3.0 / kMetersPerRot;    // 25 rot/s^2
-    /** Jog limits for jogBy(): never below the calibrated zero, never above Setpoint.Top (7 rot = 0.84 m). */
+    /** Target limits: never below the calibrated zero; max = Setpoint.Top (7 rot = 0.84 m) + 2 ft (raised 2026-09-20). */
     private static final double kJogMinRot = 0.0;
-    private static final double kJogMaxRot = 7.0;
+    private static final double kJogMaxRot = 7.0 + edu.wpi.first.math.util.Units.feetToMeters(2.0) / kMetersPerRot; // 12.08 rot = 1.45 m
 
     private static final double kGearRatio = 4;
     private static final Distance kDrumRadius = Meters.of(0.0191008);
-    private static final Distance kMaxHeight = Meters.of(1.0); // sim + Mechanism2d only (reference had 0 -> degenerate sim)
+    private static final Distance kMaxHeight = Meters.of(1.6); // sim + Mechanism2d only (reference had 0 -> degenerate sim)
 
     /* leader and follower motors */
     private final CANBus kCANBus = new CANBus("rio");
@@ -334,6 +334,17 @@ public class Elevator extends SubsystemBase {
             setTargetMeters((targetRotations + deltaRot) * kMetersPerRot);
             System.out.printf("Elevator: target -> %.3f rot (%.3f m)%n", targetRotations, targetRotations * kMetersPerRot);
         }).withName("ElevatorJog");
+    }
+
+    /**
+     * Continuous jog: while this command runs, the held target moves at {@code metersPerSecond} (clamped to the
+     * limits); when it ends (button released) the target simply stops where it is and holdTarget() keeps it there.
+     * No subsystem requirement (the default command does the driving).
+     */
+    public Command jogContinuous(double metersPerSecond) {
+        return edu.wpi.first.wpilibj2.command.Commands.run(
+                () -> setTargetMeters(targetRotations * kMetersPerRot + metersPerSecond * 0.02))
+            .withName("ElevatorJogContinuous");
     }
 
     /**

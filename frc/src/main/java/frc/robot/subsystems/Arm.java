@@ -223,6 +223,23 @@ public class Arm extends SubsystemBase {
         .withName("ArmJog");
   }
 
+  /**
+   * Continuous jog: while running, the held target moves at {@code metersPerSecond} (clamped to the soft limits);
+   * on release it stops where it is and holdTarget() keeps it there. No subsystem requirement.
+   */
+  public Command jogContinuous(double metersPerSecond) {
+    return Commands.run(
+            () -> {
+              setpointMeters =
+                  MathUtil.clamp(
+                      setpointMeters + metersPerSecond * 0.02,
+                      ArmConstants.kSoftLimitIn.in(Meters),
+                      ArmConstants.kSoftLimitOut.in(Meters));
+              atSetpointLatched = false;
+            })
+        .withName("ArmJogContinuous");
+  }
+
   /** Holds the arm at its current position with MotionMagic. */
   public Command holdPosition() {
     return runOnce(

@@ -43,7 +43,7 @@ import org.littletonrobotics.junction.Logger;
  * <p>Carousel demo (mock geometry in {@link frc.robot.CarouselConstants}): A = dock at LEVEL_1, B = dock at
  * LEVEL_2, X = dock at LEVEL_1 then grab from LEVEL_2 — with real pinch / un-pinch (measured servo angles).
  * RB / LB = pinch / release by hand. {@link Superstructure#setEndpointPosition} moves both mechanisms together.
- * 1-inch jogs live on the D-pad: up / down = elevator ±1 in, right / left = arm ±1 in.
+ * D-pad = continuous jog while held (up / down = elevator, right / left = arm), stops on release.
  * Both mechanisms hold their targets with MotionMagic, cruise capped at 0.75 m/s. The elevator calibrates its
  * zero on the first teleop/test enable; the arm's zero is its power-on position. The pincher boots OPEN.
  *
@@ -54,7 +54,7 @@ public class RobotContainer {
   private final double kMaxSpeed =
       TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * Constants.DriveConstants.kTeleopScalar; // safety §2
   private final double kMaxAngularRate =
-      RotationsPerSecond.of(0.75).in(RadiansPerSecond) * Constants.DriveConstants.kTeleopScalar;
+      RotationsPerSecond.of(0.75).in(RadiansPerSecond) * Constants.DriveConstants.kTeleopRotationScalar;
 
   private final SwerveRequest.FieldCentric drive =
       new SwerveRequest.FieldCentric()
@@ -136,11 +136,11 @@ public class RobotContainer {
     joystick.rightBumper().onTrue(pincher.pinch());
     joystick.leftBumper().onTrue(pincher.release());
 
-    // Incremental control moved to the D-pad — one press = one inch on the held target (clamped per axis).
-    joystick.povUp().onTrue(elevator.jogBy(kJogStep));              // elevator up 1 in
-    joystick.povDown().onTrue(elevator.jogBy(kJogStep.unaryMinus())); // elevator down 1 in
-    joystick.povRight().onTrue(arm.jogBy(kJogStep));                // arm out 1 in
-    joystick.povLeft().onTrue(arm.jogBy(kJogStep.unaryMinus()));    // arm in 1 in
+    // D-pad: continuous jog while held, stop on release (targets move at kElevatorJogRateMps / kArmJogRateMps).
+    joystick.povUp().whileTrue(elevator.jogContinuous(OperatorConstants.kElevatorJogRateMps));    // elevator up
+    joystick.povDown().whileTrue(elevator.jogContinuous(-OperatorConstants.kElevatorJogRateMps)); // elevator down
+    joystick.povRight().whileTrue(arm.jogContinuous(OperatorConstants.kArmJogRateMps));           // arm out (right)
+    joystick.povLeft().whileTrue(arm.jogContinuous(-OperatorConstants.kArmJogRateMps));           // arm in
 
     // ── DISABLED (restore from tag m0-hw) ──
     // joystick.back().onTrue(arm.zeroHere());
@@ -194,8 +194,8 @@ public class RobotContainer {
 
   /**
    * Sim self-test (agents): SUBZERO_SIM_JOG_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless
-   * → calibrate, then 4 × (+1 in) jogs and 2 × (−1 in) on the elevator, 3 × (+1 in) and 1 × (−1 in) on the arm;
-   * expect Elevator/height_m ≈ 0.0508 m and Arm/extension_m ≈ 0.0508 m at the end.
+   * → calibrate, then continuous jogs: elevator +2 s / −1 s, arm +2 s / −1 s at the D-pad rates;
+   * expect Elevator/height_m ≈ 0.15 m and Arm/extension_m ≈ 0.15 m at the end.
    */
   {
     if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_JOG_TEST") != null) {
@@ -203,16 +203,14 @@ public class RobotContainer {
           .onTrue(
               Commands.sequence(
                       Commands.waitSeconds(3.0), // let calibrateZero finish
-                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
-                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
-                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
-                      elevator.jogBy(kJogStep), Commands.waitSeconds(1.5),
-                      elevator.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(0.3),
-                      elevator.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(1.5),
-                      arm.jogBy(kJogStep), Commands.waitSeconds(0.3),
-                      arm.jogBy(kJogStep), Commands.waitSeconds(0.3),
-                      arm.jogBy(kJogStep), Commands.waitSeconds(1.5),
-                      arm.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(1.5))
+                      elevator.jogContinuous(OperatorConstants.kElevatorJogRateMps).withTimeout(2.0), // +0.30 m
+                      Commands.waitSeconds(1.0),
+                      elevator.jogContinuous(-OperatorConstants.kElevatorJogRateMps).withTimeout(1.0), // −0.15 m
+                      Commands.waitSeconds(1.0),
+                      arm.jogContinuous(OperatorConstants.kArmJogRateMps).withTimeout(2.0), // +0.30 m
+                      Commands.waitSeconds(1.0),
+                      arm.jogContinuous(-OperatorConstants.kArmJogRateMps).withTimeout(1.0), // −0.15 m
+                      Commands.waitSeconds(1.0))
                   .withName("SimJogTest"));
     }
   }
