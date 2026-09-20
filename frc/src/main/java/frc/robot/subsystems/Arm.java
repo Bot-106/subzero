@@ -44,7 +44,8 @@ import org.littletonrobotics.junction.Logger;
 
 /**
  * Linear extending arm — one Kraken X60 (CAN {@link ArmConstants#kCanId}) driving a belt carriage,
- * like the X axis of a 3D printer. NOT a pivot: horizontal travel, so the feedforward has no gravity
+ * like the X axis of a 3D printer. IT EXTENDS TO THE ROBOT'S RIGHT (−Y, the side the right camera faces):
+ * positive extension = further to the right. NOT a pivot: horizontal travel, so the feedforward has no gravity
  * term (kG = 0); kS + kV (+kA) only.
  *
  * <p>No limit switches. Zero = wherever the carriage sits at power-on (the constructor calls

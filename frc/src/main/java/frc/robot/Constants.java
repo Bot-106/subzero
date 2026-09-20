@@ -115,7 +115,8 @@ public final class Constants {
     // TODO(hardware) H-05 — arm Kraken X60 CAN id (rio bus). ONE motor, no follower.
     public static final int kCanId = 40;
 
-    // The arm is a LINEAR axis (3D-printer X carriage), not a pivot: no limit switches; zero = wherever the
+    // The arm is a LINEAR axis (3D-printer X carriage) that extends to the robot's RIGHT (−Y, toward the right
+    // camera) — positive = further right. Not a pivot: no limit switches; zero = wherever the
     // carriage is at power-on (Back button re-zeroes at the current position). Soft limits are relative to that zero.
     // Belt drive (measured 2026-09-19): 14-tooth HTD 5 mm pulley, belt anchored at both ends and wrapped over the
     // pulley → carriage travel = belt surface travel = 14 × 5 mm = 70 mm per PULLEY revolution (no 2:1 reeving).

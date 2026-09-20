@@ -190,6 +190,16 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /** The room cameras this drivetrain fuses (left, right). */
+  /** The camera that faces the robot's LEFT (+Y). */
+  public RoomCamera getLeftCamera() {
+    return leftCamera;
+  }
+
+  /** The camera that faces the robot's RIGHT (−Y) — the side the arm extends toward. */
+  public RoomCamera getRightCamera() {
+    return rightCamera;
+  }
+
   public RoomCamera[] getCameras() {
     return swerveCameras;
   }
