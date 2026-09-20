@@ -144,7 +144,7 @@ public final class Constants {
 
     public static final Distance kTolerance = Meters.of(0.02);
 
-    // ── MotionMagic + feedforward (see docs/motionmagic-tuning.md). Units: pulley = rotor rotations (direct drive).
+    // ── MotionMagic + feedforward (see frc/MOTIONMAGIC-TUNING.md). Units: pulley = rotor rotations (direct drive).
     // Linear horizontal axis → no gravity term: kG = 0 (GravityType Elevator_Static = constant, so a small
     // kG only if the axis is inclined). TODO(tuning) — all of these are untuned placeholders.
     public static final double kP = 12.0; // V per mechanism (pulley) rotation (= per 0.070 m) of error
@@ -251,7 +251,7 @@ public final class Constants {
     public static final int kLocationTagIdMin = 1;
     public static final int kLocationTagIdMax = 12;
 
-    // TODO(hardware) H-16 — room dimensions (m), origin, measured tag poses (see docs/room-layout.md).
+    // TODO(hardware) H-16 — room dimensions (m), origin, measured tag poses (frc/src/main/deploy/room-layout.json).
     public static final double kRoomLengthMeters = 8.0;
     public static final double kRoomWidthMeters = 6.0;
 
@@ -281,7 +281,9 @@ public final class Constants {
     /** Time-box for elevatorTo / armTo (stow uses 2x) and each SimSequence step; MotionMagic moves take < 3 s. */
     public static final double kMechanismTimeoutSeconds = 6.0;
 
-    // TODO(hardware) H-13 — tool ids ↔ static IPs live in integration/bridge/config.yaml; the RoboRIO only knows ids.
+    // TODO(hardware) H-13 — end-effector boards join the robot WiFi with static IPs; the RoboRIO talks HTTP to them
+    // directly (no laptop bridge any more). Index = tool id − 1. Radio 10.13.60.1, RoboRIO 10.13.60.2.
+    public static final String[] kToolIps = {"10.13.60.31", "10.13.60.32"};
     public static final int kToolIdCount = 2; // H-09
     public static final int kDefaultToolId = 1;
 

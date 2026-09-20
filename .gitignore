@@ -5,7 +5,6 @@ frc/logs/*.hoot
 frc/bin
 frc/ctre_sim
 esp32/**/.pio
-integration/.venv
 **/__pycache__
 .DS_Store
 frc/.project

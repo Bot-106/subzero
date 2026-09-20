@@ -1,6 +1,6 @@
 # Subzero end-effector firmware (ESP32-S3-DevKitC-1, DRV8833, open-loop timed DC motor)
 
-One board per swappable end effector. Implements `docs/contracts.md` §C.2 (ESP32 HTTP API v0)
+One board per swappable end effector. Implements the ESP32 HTTP API v0 (route table in "Contract notes" below; the RoboRIO is the client, over the robot WiFi)
 byte-identically, lifted from `esp32/legacy-servo-tool/`. The two hobby servos of the legacy
 firmware are replaced by **one brushed DC motor on a DRV8833 H-bridge, driven open loop**:
 there is no position feedback of any kind, every command is simply *"run forwards for x ms"*
@@ -81,7 +81,7 @@ v1.1** — H-26, edit `config.h`). Avoid GPIO 0/3/45/46 (strapping), 19/20 (USB)
   "holds position". For an open-loop DC motor the hold-equivalent is **STOP**: any run in
   progress is cancelled with a brake (motor shorted, resists back-driving, draws no supply
   current), the driver stays awake, and **new runs are refused** — HTTP `503`
-  `{"ok":false,"seq":i,"err":"lost_link"}` with `lastSeq` *not* advanced, so the bridge's
+  `{"ok":false,"seq":i,"err":"lost_link"}` with `lastSeq` *not* advanced, so the robot's
   normal retry (3 × 100 ms) succeeds as soon as its heartbeat lands. One `/heartbeat` returns
   `state` to `OK`; the motor stays stopped until commanded again. It never detaches on link
   loss alone (`LINK_LOSS_BEHAVIOUR STOP`). Consequence for the bench: **`curl` actuates only
@@ -160,7 +160,7 @@ Everything is timed, so calibration = *time a full stroke with `/run`*:
 ## Bench test (acceptance test 4 — all routes)
 
 Point `curl` at the board's static IP (`10.13.60.31` for end effector 1). No auth, no TLS
-(closed robot WiFi, `docs/contracts.md` §C.2 Δ). Keep the heartbeat loop from "First
+(closed robot WiFi). Keep the heartbeat loop from "First
 power-on" running (`kill %1` stops it).
 
 ```bash
@@ -233,15 +233,15 @@ mechanism needs active holding force it needs a self-locking drive (worm / lead 
 hardware answer, not a firmware one. `LINK_LOSS_BEHAVIOUR STOP` is the only sane open-loop
 choice for link loss and should stay.
 
-## Contract notes (docs/contracts.md §C.2, implemented byte-identically)
+## Contract notes (ESP32 HTTP API v0 — this README is now its home)
 
 - Every response is `Content-Type: application/json`.
 - Malformed/missing JSON body → HTTP 400 `{"ok":false,"seq":0,"err":"bad_json"}`.
 - `mm` outside `[0, LATERAL_MAX_MM]` is clamped, never rejected; the clamped value is echoed.
 - `seq <= lastSeq` is acknowledged `{"ok":true,"seq":i,"dup":true}` without re-actuating.
-- `/heartbeat` every 200 ms from the bridge; `LOST_LINK` after 1000 ms silence → motor stopped
+- `/heartbeat` every 200 ms from the robot (RoboRIO); `LOST_LINK` after 1000 ms silence → motor stopped
   (open-loop hold), new runs refused with `503 lost_link` until a heartbeat returns.
-- No authentication (same closed robot WiFi as the bridge).
+- No authentication (closed robot WiFi).
 - Any undefined route/method → HTTP 404 `{"ok":false,"seq":0,"err":"not_found"}`.
 - Additive only: extra `/status` fields listed above, `POST /run`, and the `503 lost_link`
   refusal. Nothing renamed/removed.
