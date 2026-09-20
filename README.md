@@ -12,7 +12,14 @@ esp32/   endeffector/       one ESP32-S3 per end effector: DRV8833 DC motor, tim
 CAD/     mechanical design — source, exports, drawings, BOM
 ```
 
-## Vision prototyping (tag `vision-proto`, HEAD) — drivetrain + localization only
+## Current HEAD (tag `jog-control`): drivetrain + vision + elevator + arm with incremental (1-inch) control
+
+- **Elevator** (CTREELEVATOR config; MotionMagic cruise capped to **0.75 m/s** = 6.25 rps, accel 3 m/s²): the default command holds a persistent target; **X / Y = target +1 in / −1 in**, clamped to [0, 7 rot = 0.84 m]; `calibrateZero` on the first enable resets the target to 0. (Deviation from the reference file: hold-target default instead of `manualDrive(0)`; `kMaxHeight` 1.0 m for the sim only.)
+- **Arm** (single Kraken, 14T HTD-5 direct drive, no switches; cruise **0.75 m/s**, accel 1.5 m/s²): **A / B = target +1 in / −1 in**, clamped to the soft limits [0, 0.43 m]; zero = power-on position.
+- **Start** = zero yaw (moved from B). Pincher remains disabled in `RobotContainer`.
+- Sim proof (`SUBZERO_SIM_JOG_TEST=1`, `frc/logs/akit_26-09-20_04-34-04.wpilog`): elevator target 0.025 → 0.051 → 0.076 → 0.102 → 0.076 → 0.051 m with the carriage following (peak 0.28 m/s), arm 0.025 → 0.051 → 0.076 → 0.051 m (peak 0.23 m/s); jogs are requirement-free so they never interrupt the hold or the first-enable calibration.
+
+## Vision prototyping (tag `vision-proto`) — localization
 
 - **Room layout** (`frc/tools/gen_room_layout.py` → `frc/src/main/deploy/room-layout.json`): 3D-printed 36h11 sheets (266.7 mm plate, 165.1 mm black square — confirm with a tape measure), laid edge-to-edge with every other sheet omitted (centre pitch 2 sheets), bottom edge 4.6 sheets up (centre 1.360 m). LEFT wall from the front-left corner: IDs 5, 6, 8, 9 (first sheet in the corner). FRONT wall from the front-left corner: IDs 2, 3, 4 (first sheet 3.27 sheets from the corner). Frame: +X toward the FRONT wall (joystick forward), +Y toward the LEFT wall, Z up; the room box (6 × 4 m) is a placeholder that only translates the layout. **Upload the same JSON to PhotonVision** (AprilTag pipeline, tag size 0.1651 m, camera names `photoncamera_left` / `photoncamera_right`).
 - **Cameras** (`Constants.VisionConstants`): lens 36.722 in (0.9327 m) up, 26 cm behind the front edge and 19.5 cm in from each side of the 29.5 in frame → (+0.115, ±0.180, 0.933) m; level (roll/pitch 0); left faces +Y (yaw +90°), right faces −Y (yaw −90°).
