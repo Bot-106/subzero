@@ -23,6 +23,8 @@ public final class AutoConstants {
   public static final double kMaxAccelMps2 = 0.5;
   public static final double kMaxAngularDegPerSec = 120.0;
   public static final double kMaxAngularAccelDegPerSec2 = 240.0;
+  /** PathPlanner trajectories are generated at this fraction of the caps so feed-forward + PID feedback stays under them. */
+  public static final double kPathConstraintDerate = 0.85;
   /** Localisation spin: one full turn at kMaxAngularDegPerSec ≈ 3 s. */
   public static final double kSpinDegrees = 360.0;
 
@@ -38,8 +40,21 @@ public final class AutoConstants {
       new Translation2d(
           Constants.VisionConstants.kRoomLengthMeters - 1.5, Constants.VisionConstants.kRoomWidthMeters - 1.5);
 
-  /** Distance from the tag (along its normal, into the room) of the PathPlanner staging pose; the camera align starts here. */
-  public static final Distance kStagingDistance = Meters.of(1.20);
+  /**
+   * Distance from the tag (along its normal, into the room) of the PathPlanner staging pose; the camera align starts
+   * here. GEOMETRY: the right lens sits 0.43 m below the tag centres with pitch 0; the camera's ±20° vertical FOV
+   * needs all four tag corners in frame, which is only true with the robot centre ≥ ~1.6 m from the wall. So the
+   * staging pose is 2.1 m out (tag well inside the frame).
+   */
+  public static final Distance kStagingDistance = Meters.of(2.10);
+
+  /**
+   * The poke stand-off (0.80 m) is INSIDE the camera's blind zone (see kStagingDistance). With this true, the align
+   * command uses the camera while it can see the tag, then carries the last sighting forward on the drivetrain's
+   * pose delta for the final ~0.9 m (sim: 0.7 cm / 0.02° at the stand-off). Set false only if the right camera is
+   * pitched up enough to keep the tag in frame at 0.80 m (VisionConstants.kRightCameraPitchDeg ≈ −25).
+   */
+  public static final boolean kAlignOdometryBridge = true;
 
   /**
    * Final robot-centre-to-tag distance for the poke (arm at 0.43 m must reach the tag: frame half-width 0.375 m +

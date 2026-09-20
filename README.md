@@ -12,7 +12,16 @@ esp32/   endeffector/       one ESP32-S3 per end effector: DRV8833 DC motor, tim
 CAD/     mechanical design — source, exports, drawings, BOM
 ```
 
-## Current HEAD (tag `pinch-wired`): measured servo angles locked in, pinch/un-pinch in the choreography
+## Current HEAD (tag `tag-tour-auto`): "tag tour" autonomous (PathPlanner + camera-only align + poke)
+
+`autos/TagTourAuto.java` = `getAutonomousCommand()`. Speeds: translation ≤ 0.47 m/s (10 %), rotation ≤ 120 °/s (`AutoConstants`). No pincher use.
+1. Calibrate the elevator (if not yet), **spin 360° in ~3 s** (`SpinToLocalize`) so both cameras sweep every tag and the global fused pose settles.
+2. For tags 2, 3, 4, 6, 8, 9 (ID 5 skipped): **PathPlanner** on the global pose to a staging pose 2.1 m in front of the tag with the RIGHT side toward it (`DriveToPose`, on-the-fly `PathPlannerPath`, `AutoBuilder` configured on the CTRE drivetrain like Rebuilt2026) → **`AlignRightCameraToTag`**: holonomic control on the right camera's own view of that tag (`bestCameraToTarget`), to the 0.80 m stand-off → **`PokeTag`**: arm at 0 → elevator up to 0.84 m → arm out to 0.43 m (to the RIGHT, into the tag) → arm back → elevator down → PathPlanner back to the room centre (global pose). A poke is skipped if the alignment did not succeed.
+3. **Geometry caveat (real):** the right lens is 0.43 m below the tag centres and level, so with the camera's ~40° vertical FOV the tag leaves the frame closer than ~1.6 m (all four corners are required). The align therefore uses the camera down to that point and carries the last sighting on the drivetrain pose delta for the final ~0.9 m (`AutoConstants.kAlignOdometryBridge = true`). Pitching the right camera up ≈ 25° (`VisionConstants.kRightCameraPitchDeg = -25`, then re-measure H-14) would make it camera-only all the way and allow `kAlignOdometryBridge = false`.
+4. **Where to see the paths in AdvantageScope** (log or live NT): `PathPlanner/ActivePath` (Pose2d[] — drag onto the Odometry/3D field as a *Trajectory*; it appears when a leg starts and clears when it ends), `PathPlanner/TargetPose` and `CurrentPose` (follower), `Auto/PlanPoses` (every staging/aligned/centre pose of the whole tour, logged once at start), `Auto/Align/GoalPose` (camera-align goal), `Auto/Align/tagInRobot`, `Auto/Step`, `Auto/Poke/step`, `Auto/Spin/progressDeg`. Live NT: `/PathPlanner/ActivePath`, `/PathPlanner/TargetPose`.
+5. Sim proof (`SUBZERO_SIM_TOUR_TEST=1 SUBZERO_SIM_AUTOENABLE=auto ./gradlew simulateJava -Pheadless`, `frc/logs/akit_26-09-20_07-47-26.wpilog`): odometry started 0.5 m / 20° wrong → 7 mm / 0.26° after the spin; all six tags aligned within ≤ 11 mm / 0.36° of the goal and poked (elevator 0.841 m, arm 0.431 m, correct order); peak 0.467 m/s; yaw peaks 130 °/s briefly inside PathPlanner rotation corrections (`kPathConstraintDerate` 0.85); 127 s total; final global error 4 mm / 0.25°.
+
+## Previous step (tag `pinch-wired`): measured servo angles locked in, pinch/un-pinch in the choreography
 
 - Measured 2026-09-20 with the NT angle test: **servo A (PWM 8) 54° open / 89° pinched; servo B (PWM 9) 72° open / 37° pinched** (`PincherConstants.kJaw{A,B}{Open,Closed}Deg`). `Pincher.pinch()` / `release()` write those pairs; the jaws boot OPEN. `Superstructure` now really pinches at grab/3 and un-pinches at dock/4, each followed by `kServoTravelSeconds` (0.5 s). **RB / LB = pinch / release by hand.** The dashboard entries still override live for retesting. Sim (`akit_26-09-20_06-16-08.wpilog`): jaws 54/72 through the dock, 89/37 from grab/3 onward.
 

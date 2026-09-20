@@ -19,8 +19,11 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.AutoConstants;
 import frc.robot.CarouselConstants.CarouselSlot;
 import frc.robot.Constants.OperatorConstants;
+import frc.robot.autos.TagTourAuto;
+import frc.robot.commands.AutoSimHooks;
 import frc.robot.commands.Superstructure;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Arm;
@@ -82,6 +85,14 @@ public class RobotContainer {
   public RobotContainer() {
     robotState.setAllSuppliers(drivetrain::getPose, drivetrain::getChassisSpeeds);
     configureBindings();
+    AutoSimHooks.install(drivetrain, elevator, arm); // sim-only env hooks (SUBZERO_SIM_ALIGN_TEST / SPIN_TEST / POKE_TEST)
+    // Sim tour test: SUBZERO_SIM_TOUR_TEST=1 SUBZERO_SIM_AUTOENABLE=auto → truth at the room centre, odometry deliberately
+    // 0.5 m / 20° off, then the autonomous routine runs (Robot.autonomousInit schedules getAutonomousCommand()).
+    if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_TOUR_TEST") != null) {
+      final Pose2d truth = new Pose2d(AutoConstants.kFieldCenter, Rotation2d.kZero);
+      drivetrain.resetSimTruth(truth);
+      drivetrain.resetPose(truth.plus(new Transform2d(0.5, 0.0, Rotation2d.fromDegrees(20.0))));
+    }
   }
 
   private void configureBindings() {
@@ -230,7 +241,8 @@ public class RobotContainer {
     Logger.recordOutput("Elevator/calibrated", elevatorCalibrated);
   }
 
+  /** Autonomous = the tag tour (spin → visit every tag: path, camera-align, poke, path back). */
   public Command getAutonomousCommand() {
-    return Commands.none();
+    return TagTourAuto.create(drivetrain, elevator, arm, () -> elevatorCalibrated, () -> elevatorCalibrated = true);
   }
 }

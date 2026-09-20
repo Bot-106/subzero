@@ -5,6 +5,12 @@ import com.ctre.phoenix6.swerve.SwerveDrivetrainConstants;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.config.ModuleConfig;
+import com.pathplanner.lib.config.PIDConstants;
+import com.pathplanner.lib.config.RobotConfig;
+import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.util.PathPlannerLogging;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -14,15 +20,23 @@ import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructArrayPublisher;
+import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants;
+import frc.robot.commands.DriveToPose;
+import frc.robot.generated.TunerConstants;
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 import frc.robot.util.RobotState;
 import java.util.Optional;
@@ -35,7 +49,8 @@ import org.photonvision.EstimatedRobotPose;
  * be used in command-based projects.
  *
  * <p>Base: the 2026 Tuner X Swerve Project Generator output as used by FRC 1360 (Rebuilt2026
- * CommandSwerveDrivetrain) minus PathPlanner / AutoBuilder and minus SysId (WPILib's SysIdRoutine
+ * CommandSwerveDrivetrain) WITH PathPlanner / AutoBuilder ({@link #configureAutoBuilder()}, RobotConfig built
+ * programmatically — there is no deploy/pathplanner/settings.json) and minus SysId (WPILib's SysIdRoutine
  * starts DataLogManager on construction, which would compete with AdvantageKit's WPILOGWriter —
  * A-06 / D-21). Vision localisation is the Rebuilt2026 way: the two {@link RoomCamera}s are
  * constructed INSIDE the drivetrain and {@link #updatePose()} (verbatim Rebuilt2026 loop) fuses
@@ -70,6 +85,45 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
   public final Trigger swerveAtTargetHeading =
       new Trigger(() -> facingAngleRequest.HeadingController.atSetpoint());
+
+  // ───────────────────────────── PathPlanner (Rebuilt2026 configureAutoBuilder lift) ─────────────────────────────
+
+  /** Swerve request applied while following a PathPlanner path (robot-relative speeds + wheel force feedforwards). */
+  private final SwerveRequest.ApplyRobotSpeeds m_pathApplyRobotSpeeds = new SwerveRequest.ApplyRobotSpeeds();
+
+  /**
+   * PathPlanner translation / rotation PID (feedback on top of the trajectory feedforward). Rebuilt2026 runs 12 / 7
+   * at full speed; the tour paths are capped at 0.47 m/s (frc.robot.AutoConstants), so 5 / 5 is plenty and softer.
+   */
+  private static final PIDConstants kPathTranslationPid = new PIDConstants(5.0, 0.0, 0.0);
+  private static final PIDConstants kPathRotationPid = new PIDConstants(5.0, 0.0, 0.0);
+
+  /**
+   * Wheel coefficient of friction used by PathPlanner's RobotConfig to bound acceleration. 1.0 is a placeholder
+   * (Colson/billet tread on carpet is ≈ 1.0–1.2; on the room's floor it is unknown). Irrelevant at 0.5 m/s²:
+   * the friction limit (≈ 9.8 m/s² × COF) is never reached. TODO(hardware) H-20 — orchestrator: move to
+   * Constants.DriveConstants next to kRobotMassKg / kRobotMoiKgM2 (this worker does not own Constants.java).
+   */
+  private static final double kWheelCofPlaceholder = 1.0;
+
+  /** True once {@link AutoBuilder#configure} succeeded (logged as PathPlanner/Configured every loop). */
+  private boolean m_autoBuilderConfigured = false;
+
+  /**
+   * Live NetworkTables mirrors of the PathPlanner logging callbacks (Rebuilt2026 StructArrayPublisher style) so the
+   * active path / target pose are visible in AdvantageScope + Glass even without the AdvantageKit NT4Publisher.
+   * The same data goes to Logger.recordOutput("PathPlanner/…") for the .wpilog.
+   */
+  private final NetworkTable m_ntPathPlanner = NetworkTableInstance.getDefault().getTable("PathPlanner");
+  private final StructArrayPublisher<Pose2d> m_ntActivePath =
+      m_ntPathPlanner.getStructArrayTopic("ActivePath", Pose2d.struct).publish();
+  private final StructPublisher<Pose2d> m_ntTargetPose =
+      m_ntPathPlanner.getStructTopic("TargetPose", Pose2d.struct).publish();
+  private final StructPublisher<Pose2d> m_ntCurrentPose =
+      m_ntPathPlanner.getStructTopic("CurrentPose", Pose2d.struct).publish();
+
+  /** Last active path handed to the logging callback (empty once a path ends → stale paths vanish). */
+  private Pose2d[] m_lastActivePath = new Pose2d[0];
 
   // ───────────────────────────── room cameras (Rebuilt2026 style) ─────────────────────────────
 
@@ -175,6 +229,129 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     // Register explicitly so periodic()/simulationPeriodic() (pose fusion + logging) run even before
     // RobotContainer binds a default command. The generated project relies on setDefaultCommand for this.
     register();
+
+    configureAutoBuilder();
+    configurePathPlannerLogging();
+
+    // Sim self-test (agents): SUBZERO_SIM_PATH_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless
+    // → 2 s after enable: truth + odometry are put at (4.5, 2.3, 0°) (the vision-test start), then DriveToPose runs an
+    //   on-the-fly PathPlanner path to (4.8, 3.0, 90°) under the AutoConstants caps. Watch Drive/Pose, Drive/Speeds,
+    //   PathPlanner/ActivePath (Pose2d[]), PathPlanner/GoalPose, PathPlanner/DriveToPose/* in frc/logs/akit_*.wpilog.
+    if (Utils.isSimulation() && System.getenv("SUBZERO_SIM_PATH_TEST") != null) {
+      final Pose2d kSimPathStart = new Pose2d(4.5, 2.3, Rotation2d.kZero);
+      final Pose2d kSimPathGoal = new Pose2d(4.8, 3.0, Rotation2d.fromDegrees(90.0));
+      new Trigger(DriverStation::isEnabled)
+          .onTrue(
+              Commands.sequence(
+                      Commands.waitSeconds(2.0),
+                      runOnce(
+                          () -> {
+                            resetSimTruth(kSimPathStart);
+                            resetPose(kSimPathStart);
+                          }),
+                      Commands.waitSeconds(0.5),
+                      DriveToPose.driveToPose(this, kSimPathGoal),
+                      // Hold still for a moment so the log shows the settled end pose.
+                      applyRequest(() -> m_pathApplyRobotSpeeds.withSpeeds(new ChassisSpeeds())).withTimeout(1.0))
+                  .withName("SimPathTest"));
+    }
+  }
+
+  // ───────────────────────────── PathPlanner AutoBuilder ─────────────────────────────
+
+  /**
+   * Rebuilt2026's configureAutoBuilder(), except the {@link RobotConfig} is built here from TunerConstants /
+   * Constants.DriveConstants instead of {@code RobotConfig.fromGUISettings()} (no PathPlanner GUI project exists).
+   * Paths are followed with robot-relative speeds + wheel force feedforwards; flipping is disabled (a room has no
+   * alliances). Failures are reported to the DS and leave {@code PathPlanner/Configured} false — every
+   * {@link AutoBuilder#followPath} would then throw, so DriveToPose guards on {@link AutoBuilder#isConfigured()}.
+   */
+  private void configureAutoBuilder() {
+    try {
+      final RobotConfig config = buildRobotConfig();
+      AutoBuilder.configure(
+          this::getPose, // Supplier of current robot pose (fused)
+          this::resetPose, // Consumer for seeding pose against auto
+          this::getChassisSpeeds, // Supplier of current robot-relative speeds
+          // Consumer of ChassisSpeeds and feedforwards to drive the robot
+          (speeds, feedforwards) ->
+              setControl(
+                  m_pathApplyRobotSpeeds
+                      .withSpeeds(speeds)
+                      .withWheelForceFeedforwardsX(feedforwards.robotRelativeForcesXNewtons())
+                      .withWheelForceFeedforwardsY(feedforwards.robotRelativeForcesYNewtons())),
+          new PPHolonomicDriveController(kPathTranslationPid, kPathRotationPid),
+          config,
+          () -> false, // room: never flip paths for an alliance
+          this // Subsystem for requirements
+          );
+      m_autoBuilderConfigured = AutoBuilder.isConfigured();
+    } catch (Exception ex) {
+      m_autoBuilderConfigured = false;
+      DriverStation.reportError(
+          "Failed to build PathPlanner RobotConfig / configure AutoBuilder: " + ex, ex.getStackTrace());
+    }
+  }
+
+  /**
+   * PathPlanner robot model from the same numbers the drivetrain itself was built with: module locations from the
+   * constructed drivetrain, wheel radius / gear ratio / free speed / slip current from TunerConstants.FrontLeft
+   * (all four modules are identical), mass + MOI from Constants.DriveConstants (H-20 placeholders).
+   */
+  private RobotConfig buildRobotConfig() {
+    final var module = TunerConstants.FrontLeft; // WheelRadius (m), DriveMotorGearRatio, SpeedAt12Volts (m/s), SlipCurrent (A)
+    // 4.73 m/s = Kraken X60 (6000 rpm) / 6.746 × 2π × 0.0508 m — the chassis is MK4i L2 on Kraken X60s. FOC only
+    // with a Pro licence (Constants.DriveConstants.kAssumePhoenixPro, H-23); the difference is a few % of torque.
+    final DCMotor driveMotor =
+        Constants.DriveConstants.kAssumePhoenixPro ? DCMotor.getKrakenX60Foc(1) : DCMotor.getKrakenX60(1);
+    final ModuleConfig moduleConfig =
+        new ModuleConfig(
+            module.WheelRadius,
+            module.SpeedAt12Volts,
+            kWheelCofPlaceholder,
+            driveMotor,
+            module.DriveMotorGearRatio,
+            module.SlipCurrent,
+            1);
+    return new RobotConfig(
+        Constants.DriveConstants.kRobotMassKg,
+        Constants.DriveConstants.kRobotMoiKgM2,
+        moduleConfig,
+        getModuleLocations()); // FL, FR, BL, BR — the order the modules were passed to the constructor
+  }
+
+  /**
+   * Every path PathPlanner calculates goes to AdvantageScope two ways: {@code Logger.recordOutput("PathPlanner/…")}
+   * (.wpilog + AK NT4Publisher) and plain NetworkTables struct publishers (live even without AK). FollowPathCommand
+   * calls the active-path callback with the path poses at initialize() and with an EMPTY list at end(), so a finished
+   * or interrupted path disappears instead of lingering.
+   */
+  private void configurePathPlannerLogging() {
+    PathPlannerLogging.setLogActivePathCallback(
+        poses -> {
+          m_lastActivePath = poses.toArray(new Pose2d[0]);
+          Logger.recordOutput("PathPlanner/ActivePath", m_lastActivePath);
+          Logger.recordOutput("PathPlanner/ActivePathPoseCount", m_lastActivePath.length);
+          m_ntActivePath.set(m_lastActivePath);
+        });
+    PathPlannerLogging.setLogTargetPoseCallback(
+        pose -> {
+          Logger.recordOutput("PathPlanner/TargetPose", pose);
+          m_ntTargetPose.set(pose);
+        });
+    PathPlannerLogging.setLogCurrentPoseCallback(
+        pose -> {
+          Logger.recordOutput("PathPlanner/CurrentPose", pose);
+          m_ntCurrentPose.set(pose);
+        });
+    // Seed the topics so AdvantageScope lists them before the first path runs.
+    m_ntActivePath.set(m_lastActivePath);
+    Logger.recordOutput("PathPlanner/ActivePath", m_lastActivePath);
+  }
+
+  /** True once AutoBuilder.configure succeeded in the constructor (PathPlanner/Configured). */
+  public boolean isAutoBuilderConfigured() {
+    return m_autoBuilderConfigured;
   }
 
   // ───────────────────────────── public accessors ─────────────────────────────
@@ -262,6 +439,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     this.updatePose();
     Logger.recordOutput("Drive/VisionMeasurementsAccepted", m_visionMeasurementsAccepted);
     Logger.recordOutput("Drive/VisionMeasurementsRejected", m_visionMeasurementsRejected);
+
+    // PathPlanner status (the path / target / current-pose callbacks log on their own when a path is active).
+    Logger.recordOutput("PathPlanner/Configured", m_autoBuilderConfigured);
+    Logger.recordOutput("PathPlanner/PathActive", m_lastActivePath.length > 0);
   }
 
   /**

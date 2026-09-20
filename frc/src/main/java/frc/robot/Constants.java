@@ -272,6 +272,13 @@ public final class Constants {
     public static final double kCameraFromSideMeters = 0.195;
     public static final double kLeftCameraYawDeg = 90.0;   // faces left (+Y)
     public static final double kRightCameraYawDeg = -90.0; // faces right (−Y)
+    /**
+     * Pitch (deg, WPILib: NEGATIVE = lens tilted UP). Measured level = 0. The lenses are 0.43 m below the tag centres,
+     * so a level right camera cannot see a wall tag closer than ~1.6 m; tilting it up ≈ −25° would keep the tag in
+     * frame down to the 0.80 m poke stand-off (at the cost of losing tags beyond ~4.6 m). TODO(hardware) H-14.
+     */
+    public static final double kLeftCameraPitchDeg = 0.0;
+    public static final double kRightCameraPitchDeg = 0.0;
 
     /**
      * WHICH PHYSICAL SIDE IS THE DRIVETRAIN'S +X? The camera numbers above were measured from the side the team
@@ -287,11 +294,13 @@ public final class Constants {
      */
     public static final boolean kMeasuredFrontIsRobotPlusX = true; // TODO(hardware) H-14 — confirm with the test above
 
-    private static Transform3d cameraTransform(double xForward, double yLeft, double z, double yawDeg) {
+    private static Transform3d cameraTransform(
+        double xForward, double yLeft, double z, double pitchDeg, double yawDeg) {
       final double sign = kMeasuredFrontIsRobotPlusX ? 1.0 : -1.0;
       final double yaw = kMeasuredFrontIsRobotPlusX ? yawDeg : yawDeg + 180.0;
       return new Transform3d(
-          new Translation3d(sign * xForward, sign * yLeft, z), new Rotation3d(0.0, 0.0, Math.toRadians(yaw)));
+          new Translation3d(sign * xForward, sign * yLeft, z),
+          new Rotation3d(0.0, Math.toRadians(pitchDeg), Math.toRadians(yaw)));
     }
 
     public static final Transform3d kRobotToLeftCamera =
@@ -299,12 +308,14 @@ public final class Constants {
             kFrameHalfWidthMeters - kCameraFromFrontMeters,
             kFrameHalfWidthMeters - kCameraFromSideMeters,
             kCameraHeightMeters,
+            kLeftCameraPitchDeg,
             kLeftCameraYawDeg);
     public static final Transform3d kRobotToRightCamera =
         cameraTransform(
             kFrameHalfWidthMeters - kCameraFromFrontMeters,
             -(kFrameHalfWidthMeters - kCameraFromSideMeters),
             kCameraHeightMeters,
+            kRightCameraPitchDeg,
             kRightCameraYawDeg);
 
     // TODO(hardware) H-15 — 3D-printed sheets: the common "Full Size" 36h11 plate is 10.5 in = 266.7 mm (= AndyMark

@@ -354,6 +354,36 @@ public class RoomCamera {
     return currentUnreadResults;
   }
 
+  /**
+   * One sighting of a fiducial: the target plus the capture timestamp (seconds, FPGA time base — the
+   * same base as {@code Timer.getFPGATimestamp()}, so {@code now - timestampSeconds} is its age).
+   */
+  public record TagSighting(PhotonTrackedTarget target, double timestampSeconds) {}
+
+  /**
+   * The newest sighting of {@code tagId} among the results drained THIS loop by {@link
+   * #updatePipelineResults()} (the result with the highest capture timestamp that contains the id).
+   * Empty when no result this loop carried the tag — the caller keeps its own last sighting and uses
+   * {@link TagSighting#timestampSeconds()} to judge staleness. Additive accessor for the camera-direct
+   * align command; nothing else in this class depends on it.
+   */
+  public Optional<TagSighting> getLatestTarget(int tagId) {
+    PhotonTrackedTarget best = null;
+    double bestTime = Double.NEGATIVE_INFINITY;
+    for (PhotonPipelineResult result : currentUnreadResults) {
+      final double t = result.getTimestampSeconds();
+      if (t <= bestTime) continue;
+      for (PhotonTrackedTarget target : result.getTargets()) {
+        if (target.getFiducialId() == tagId) {
+          best = target;
+          bestTime = t;
+          break;
+        }
+      }
+    }
+    return best == null ? Optional.empty() : Optional.of(new TagSighting(best, bestTime));
+  }
+
   // Update Vision Pose (sim only — no-op on the robot)
   public void updateSimPose(Pose2d robotPose) {
     if (photonVisionSystemSim == null) return;
