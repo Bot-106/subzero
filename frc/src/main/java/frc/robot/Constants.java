@@ -155,8 +155,8 @@ public final class Constants {
     public static final double kG = 0.0;  // horizontal axis
     public static final double kV = 0.12; // V per pulley rps: 12 V / 100 rps (Kraken X60 free speed, direct drive)
     public static final double kA = 0.0;  // V per mechanism rps²
-    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.30);      // 4.3 pulley rps
-    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.0); // 14.3 pulley rps²
+    public static final LinearVelocity kCruiseVelocity = MetersPerSecond.of(0.75);      // 10.7 pulley rps (speed cap requested 2026-09-20)
+    public static final LinearAcceleration kAcceleration = MetersPerSecondPerSecond.of(1.5); // 21.4 pulley rps²
     public static final double kGoToTimeoutSeconds = 6.0;
     public static final double kToleranceHoldSeconds = 0.2;
     // TODO(hardware) H-06-adjacent, sim only — real carriage mass.

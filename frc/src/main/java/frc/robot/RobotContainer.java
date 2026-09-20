@@ -1,5 +1,6 @@
 package frc.robot;
 
+import static edu.wpi.first.units.Units.Inches;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
@@ -20,22 +21,26 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.subsystems.Elevator;
 import frc.robot.util.RobotState;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * VISION PROTOTYPING configuration (2026-09-20): DRIVETRAIN + VISION ONLY.
+ * Configuration (2026-09-20): DRIVETRAIN + VISION + ELEVATOR + ARM (incremental control).
  *
  * <p>The two RoomCameras ("photoncamera_left" / "photoncamera_right") live inside the drivetrain,
  * Rebuilt2026-style, and fuse into its pose estimator in {@code updatePose()}. {@link RobotState}
  * publishes the fused pose / velocity / tag distances (Rebuilt2026 topic names) for AdvantageScope.
  *
- * <p>Elevator, Arm and Pincher are DISABLED HERE ONLY — their classes are intact; the wiring is in the
- * commented block below (previous version: git tag {@code m0-hw}).
+ * <p>Elevator and Arm move INCREMENTALLY: X / Y = elevator target +1 in / −1 in, A / B = arm target
+ * +1 in / −1 in (one press = one inch; both subsystems hold their target with MotionMagic, cruise capped at
+ * 0.75 m/s). The elevator calibrates its zero on the first teleop/test enable; the arm's zero is its
+ * power-on position. Pincher stays disabled here (class intact; wiring at tag {@code m0-hw}).
  *
- * <p>Controls: left stick = translate (field-centric), right stick X = rotate; B = zero yaw
- * (seedFieldCentric — current heading becomes "forward" = toward the FRONT wall).
+ * <p>Controls: left stick = translate (field-centric), right stick X = rotate; Start = zero yaw
+ * (seedFieldCentric — current heading becomes "forward" = toward the FRONT wall; moved from B).
  */
 public class RobotContainer {
   private final double kMaxSpeed =
@@ -58,10 +63,13 @@ public class RobotContainer {
   private final CommandXboxController joystick =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
 
-  // ───────────── DISABLED for vision prototyping (classes intact; wiring at tag m0-hw) ─────────────
-  // public final Elevator elevator = new Elevator();
-  // private boolean elevatorCalibrated = false;
-  // public final Arm arm = new Arm();
+  // ───────────── elevator + arm (incremental jog control) ─────────────
+  public final Elevator elevator = new Elevator();
+  private boolean elevatorCalibrated = false;
+  public final Arm arm = new Arm();
+  private static final edu.wpi.first.units.measure.Distance kJogStep = Inches.of(1.0);
+
+  // ───────────── DISABLED (class intact; wiring at tag m0-hw) ─────────────
   // public final Pincher pincher = new Pincher();
 
   public RobotContainer() {
@@ -80,17 +88,26 @@ public class RobotContainer {
 
     RobotModeTriggers.disabled().whileTrue(drivetrain.applyRequest(() -> idle).ignoringDisable(true));
 
-    // B: zero yaw — the current heading becomes field-forward (toward the FRONT wall).
-    joystick.b().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric).withName("ZeroYaw"));
+    // Start: zero yaw — the current heading becomes field-forward (toward the FRONT wall). (Was B; B is now the arm.)
+    joystick.start().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric).withName("ZeroYaw"));
 
-    // ── DISABLED for vision prototyping (restore from tag m0-hw) ──
-    // RobotModeTriggers.teleop().or(RobotModeTriggers.test()).onTrue(elevator.calibrateZero()...);
-    // joystick.x().onTrue(elevator.goToSetpoint(() -> Elevator.Setpoint.Ground));
-    // joystick.y().onTrue(elevator.goToSetpoint(() -> Elevator.Setpoint.Top));
-    // joystick.leftBumper().onTrue(arm.goToSetpoint(() -> Arm.Setpoint.Retracted));
-    // joystick.rightBumper().onTrue(arm.goToSetpoint(() -> Arm.Setpoint.Rack));
-    // joystick.rightTrigger(0.1).whileTrue(arm.manualDrive(() -> joystick.getRightTriggerAxis() * ArmConstants.kJogDutyCycle));
-    // joystick.leftTrigger(0.1).whileTrue(arm.manualDrive(() -> -joystick.getLeftTriggerAxis() * ArmConstants.kJogDutyCycle));
+    // Elevator: calibrate zero on the FIRST teleop/test enable (A-01), never while disabled.
+    RobotModeTriggers.teleop()
+        .or(RobotModeTriggers.test())
+        .onTrue(
+            elevator
+                .calibrateZero()
+                .andThen(Commands.runOnce(() -> elevatorCalibrated = true))
+                .unless(() -> elevatorCalibrated)
+                .withName("ElevatorCalibrateZero"));
+
+    // Incremental control — one press = one inch on the held target (clamped to each axis' limits).
+    joystick.x().onTrue(elevator.jogBy(kJogStep));            // elevator up 1 in
+    joystick.y().onTrue(elevator.jogBy(kJogStep.unaryMinus())); // elevator down 1 in
+    joystick.a().onTrue(arm.jogBy(kJogStep));                 // arm out 1 in
+    joystick.b().onTrue(arm.jogBy(kJogStep.unaryMinus()));    // arm in 1 in
+
+    // ── DISABLED (restore from tag m0-hw) ──
     // joystick.back().onTrue(arm.zeroHere());
     // joystick.povDown().onTrue(pincher.pinch());
     // joystick.povUp().onTrue(pincher.release());
@@ -140,8 +157,35 @@ public class RobotContainer {
         .withName("SimVisionTest");
   }
 
+  /**
+   * Sim self-test (agents): SUBZERO_SIM_JOG_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless
+   * → calibrate, then 4 × (+1 in) jogs and 2 × (−1 in) on the elevator, 3 × (+1 in) and 1 × (−1 in) on the arm;
+   * expect Elevator/height_m ≈ 0.0508 m and Arm/extension_m ≈ 0.0508 m at the end.
+   */
+  {
+    if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_JOG_TEST") != null) {
+      new Trigger(DriverStation::isEnabled)
+          .onTrue(
+              Commands.sequence(
+                      Commands.waitSeconds(3.0), // let calibrateZero finish
+                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
+                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
+                      elevator.jogBy(kJogStep), Commands.waitSeconds(0.3),
+                      elevator.jogBy(kJogStep), Commands.waitSeconds(1.5),
+                      elevator.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(0.3),
+                      elevator.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(1.5),
+                      arm.jogBy(kJogStep), Commands.waitSeconds(0.3),
+                      arm.jogBy(kJogStep), Commands.waitSeconds(0.3),
+                      arm.jogBy(kJogStep), Commands.waitSeconds(1.5),
+                      arm.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(1.5))
+                  .withName("SimJogTest"));
+    }
+  }
+
   /** Called from Robot.robotPeriodic(); logging only. */
-  public void logPeriodic() {}
+  public void logPeriodic() {
+    Logger.recordOutput("Elevator/calibrated", elevatorCalibrated);
+  }
 
   public Command getAutonomousCommand() {
     return Commands.none();

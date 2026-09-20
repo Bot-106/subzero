@@ -168,8 +168,8 @@ public class Arm extends SubsystemBase {
     /* no limit switch: the power-on position is zero */
     motor.setPosition(Rotations.of(0));
 
-    /* default: hold wherever we are (Brake + MotionMagic at the current position) */
-    setDefaultCommand(holdPosition());
+    /* default: hold the persistent target (0 = the power-on zero) so A/B jogs accumulate */
+    setDefaultCommand(holdTarget());
 
     if (Utils.isSimulation()) {
       startSimThread();
@@ -195,7 +195,32 @@ public class Arm extends SubsystemBase {
 
   // ───────────────────────── commands ─────────────────────────
 
-  /** Holds the arm at its current position with MotionMagic (default command). */
+  /** Holds the persistent target (setpointMeters) with MotionMagic — the default command. */
+  public Command holdTarget() {
+    return run(() -> motor.setControl(setpointRequest.withPosition(Rotations.of(rotOf(setpointMeters)))))
+        .withName("ArmHoldTarget");
+  }
+
+  /**
+   * Moves the persistent target by {@code delta} (e.g. +/-1 inch), clamped to the soft limits; the default
+   * command drives there and holds. One press = one increment.
+   */
+  public Command jogBy(Distance delta) {
+    final double deltaM = delta.in(Meters);
+    // No subsystem requirement: it only moves the target that holdTarget() (the default command) follows.
+    return Commands.runOnce(
+            () -> {
+              setpointMeters =
+                  MathUtil.clamp(
+                      setpointMeters + deltaM,
+                      ArmConstants.kSoftLimitIn.in(Meters),
+                      ArmConstants.kSoftLimitOut.in(Meters));
+              System.out.printf("Arm: target -> %.3f m%n", setpointMeters);
+            })
+        .withName("ArmJog");
+  }
+
+  /** Holds the arm at its current position with MotionMagic. */
   public Command holdPosition() {
     return runOnce(
             () -> {
@@ -245,9 +270,15 @@ public class Arm extends SubsystemBase {
         .withName("ArmManual");
   }
 
-  /** Re-zero at the current position (no switch: this IS the homing routine). */
+  /** Re-zero at the current position (no switch: this IS the homing routine). The target follows to 0. */
   public Command zeroHere() {
-    return Commands.runOnce(() -> motor.setPosition(Rotations.of(0))).ignoringDisable(true).withName("ArmZeroHere");
+    return Commands.runOnce(
+            () -> {
+              motor.setPosition(Rotations.of(0));
+              setpointMeters = 0.0;
+            })
+        .ignoringDisable(true)
+        .withName("ArmZeroHere");
   }
 
   /** M1 seam name for {@link #zeroHere()}. */
@@ -255,9 +286,9 @@ public class Arm extends SubsystemBase {
     return zeroHere();
   }
 
-  /** M1 seam name for {@link #holdPosition()}. */
+  /** M1 seam name for the hold command. */
   public Command hold() {
-    return holdPosition();
+    return holdTarget();
   }
 
   // ───────────────────────── periodic / sim ─────────────────────────
