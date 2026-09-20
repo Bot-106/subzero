@@ -72,9 +72,9 @@ public class Elevator extends SubsystemBase {
     /** Speed cap requested 2026-09-20: ~0.75 m/s cruise, gentle accel. */
     private static final double kCruiseRps = 0.75 / kMetersPerRot;   // 6.25 rot/s
     private static final double kAccelRps2 = 3.0 / kMetersPerRot;    // 25 rot/s^2
-    /** Target limits: never below the calibrated zero; max = Setpoint.Top (7 rot = 0.84 m) + 2 ft (raised 2026-09-20). */
+    /** Target limits: never below the calibrated zero; max = Setpoint.Top (7 rot = 0.84 m) + 16 in (raised 2 ft then lowered 8 in, 2026-09-20). */
     private static final double kJogMinRot = 0.0;
-    private static final double kJogMaxRot = 7.0 + edu.wpi.first.math.util.Units.feetToMeters(2.0) / kMetersPerRot; // 12.08 rot = 1.45 m
+    private static final double kJogMaxRot = 7.0 + edu.wpi.first.math.util.Units.inchesToMeters(16.0) / kMetersPerRot; // +2 ft −8 in = +16 in → 10.39 rot = 1.25 m
 
     private static final double kGearRatio = 4;
     private static final Distance kDrumRadius = Meters.of(0.0191008);
