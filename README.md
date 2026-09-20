@@ -15,7 +15,7 @@ CAD/     mechanical design — source, exports, drawings, BOM
 ## Current HEAD: continuous D-pad jogs, faster teleop, taller elevator (2026-09-20)
 
 - **D-pad = continuous jog while held, stop on release** (`jogContinuous`): up/down = elevator at 0.15 m/s, right/left = arm at 0.15 m/s (`OperatorConstants.kElevatorJogRateMps` / `kArmJogRateMps`); the held target simply stops where you let go. Sim: 2 s / 1 s presses → 0.30 → 0.15 m on both axes.
-- **Teleop speed:** translation scalar 0.1 → **0.2** (0.95 m/s), rotation scalar 0.1 → **0.3** (0.225 rot/s ≈ 81 °/s) — `DriveConstants.kTeleopScalar` / `kTeleopRotationScalar`.
+- **Teleop speed:** translation scalar → **0.4** (1.9 m/s), rotation scalar 0.1 → **0.3** (0.225 rot/s ≈ 81 °/s) — `DriveConstants.kTeleopScalar` / `kTeleopRotationScalar`.
 - **Elevator target cap raised by 2 ft:** 7 rot (0.84 m) → 12.08 rot (**1.45 m**); sim max height 1.6 m. The auto's poke height stays at `AutoConstants.kPokeElevatorHeight` = 0.84 m (change it if the poke should use the new cap).
 
 ## Tag tour autonomous (tag `tag-tour-auto`): PathPlanner + camera-only align + poke

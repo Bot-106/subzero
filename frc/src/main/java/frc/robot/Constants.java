@@ -212,7 +212,7 @@ public final class Constants {
     public static final AngularVelocity kAutoMaxAngularRate = DegreesPerSecond.of(90);
     public static final double kAutoMaxAccelMps2 = 1.5;
     /** Teleop scalars (2026-09-20: translation doubled 0.1 → 0.2 = 0.95 m/s; rotation tripled 0.1 → 0.3 = 0.225 rot/s ≈ 81 °/s). */
-    public static final double kTeleopScalar = 0.2;
+    public static final double kTeleopScalar = 0.4;
     public static final double kTeleopRotationScalar = 0.3;
 
     /** alignToTag tolerance + leash (safety §7). */
