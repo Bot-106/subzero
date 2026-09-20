@@ -7,6 +7,7 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -58,8 +59,9 @@ public class RobotContainer {
 
   private final SwerveRequest.FieldCentric drive =
       new SwerveRequest.FieldCentric()
-          .withDeadband(kMaxSpeed * OperatorConstants.kStickDeadband)
-          .withRotationalDeadband(kMaxAngularRate * OperatorConstants.kStickDeadband)
+          // Stick deadband is applied per axis (with rescaling) in the default command; this is only a tiny backstop.
+          .withDeadband(kMaxSpeed * 0.02)
+          .withRotationalDeadband(kMaxAngularRate * 0.02)
           .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
   private final SwerveRequest.Idle idle = new SwerveRequest.Idle();
   private final SwerveRequest.ApplyRobotSpeeds robotSpeeds = new SwerveRequest.ApplyRobotSpeeds();
@@ -100,9 +102,9 @@ public class RobotContainer {
         drivetrain.applyRequest(
             () ->
                 drive
-                    .withVelocityX(-joystick.getLeftY() * kMaxSpeed)
-                    .withVelocityY(-joystick.getLeftX() * kMaxSpeed)
-                    .withRotationalRate(-joystick.getRightX() * kMaxAngularRate)));
+                    .withVelocityX(-stick(joystick.getLeftY()) * kMaxSpeed)
+                    .withVelocityY(-stick(joystick.getLeftX()) * kMaxSpeed)
+                    .withRotationalRate(-stick(joystick.getRightX()) * kMaxAngularRate)));
 
     RobotModeTriggers.disabled().whileTrue(drivetrain.applyRequest(() -> idle).ignoringDisable(true));
 
@@ -154,6 +156,11 @@ public class RobotContainer {
     if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_VISION_TEST") != null) {
       new Trigger(DriverStation::isEnabled).onTrue(simVisionTest());
     }
+  }
+
+  /** Per-axis stick deadband (OperatorConstants.kStickDeadband), rescaled so motion starts smoothly from zero. */
+  private static double stick(double raw) {
+    return MathUtil.applyDeadband(raw, OperatorConstants.kStickDeadband);
   }
 
   private Command simVisionTest() {

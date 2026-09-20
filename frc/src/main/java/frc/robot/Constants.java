@@ -386,7 +386,8 @@ public final class Constants {
 
     public static final int kDriverControllerPort = 0;
     // TODO(hardware) H-21 — driver mapping: A=alignToTag(nearest), B=stow, X=toolLatch, Y=toolRelease.
-    public static final double kStickDeadband = 0.1;
+    /** Per-axis joystick deadband (fraction of full deflection), applied with rescaling. */
+    public static final double kStickDeadband = 0.08;
     /** D-pad continuous jog rates (m/s) for the elevator and arm targets. */
     public static final double kElevatorJogRateMps = 0.15;
     public static final double kArmJogRateMps = 0.15;
