@@ -226,23 +226,19 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   @Override
   public void periodic() {
     /*
-     * Periodically try to apply the operator perspective.
-     * If we haven't applied the operator perspective before, then we should apply it regardless of DS state.
-     * This allows us to correct the perspective in case the robot code restarts mid-match.
-     * Otherwise, only check and apply the operator perspective if the DS is disabled.
-     * This ensures driving behavior doesn't change until an explicit disable event occurs during testing.
+     * Operator perspective: FORCED to the blue/+X perspective (Constants.DriveConstants.kOperatorPerspective).
+     * The generated code derives it from DriverStation.getAlliance(); a DS with no FMS defaults to RED 1, which
+     * made "forward" drive toward field −X (the REAR wall of the room layout) and made seedFieldCentric() set the
+     * heading to 180° while the robot faced the FRONT wall — a 180° fight with vision. A room has no alliances:
+     * joystick forward = field +X = the front wall, always.
      */
-    if (!m_hasAppliedOperatorPerspective || DriverStation.isDisabled()) {
-      DriverStation.getAlliance()
-          .ifPresent(
-              allianceColor -> {
-                setOperatorPerspectiveForward(
-                    allianceColor == Alliance.Red
-                        ? kRedAlliancePerspectiveRotation
-                        : kBlueAlliancePerspectiveRotation);
-                m_hasAppliedOperatorPerspective = true;
-              });
+    if (!m_hasAppliedOperatorPerspective) {
+      setOperatorPerspectiveForward(Constants.DriveConstants.kOperatorPerspective);
+      m_hasAppliedOperatorPerspective = true;
     }
+    Logger.recordOutput("Drive/OperatorPerspectiveDeg", Constants.DriveConstants.kOperatorPerspective.getDegrees());
+    Logger.recordOutput(
+        "Drive/DsAlliance", DriverStation.getAlliance().map(Enum::name).orElse("none") + " (ignored)");
 
     // AdvantageKit lite (D-21): outputs only. Struct types (Pose2d, SwerveModuleState[], ChassisSpeeds) are free.
     final var state = getState();

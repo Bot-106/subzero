@@ -7,6 +7,7 @@ import static edu.wpi.first.units.Units.Meters;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecondPerSecond;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
@@ -193,6 +194,12 @@ public final class Constants {
   public static final class DriveConstants {
     private DriveConstants() {}
 
+    /**
+     * Field-centric "forward" for the driver = field +X = the FRONT wall of the room layout, regardless of the DS
+     * alliance selector (which defaults to Red 1 with no FMS and would flip forward by 180°).
+     */
+    public static final Rotation2d kOperatorPerspective = Rotation2d.kZero;
+
     /** Safety §2 / A-14 — caps for any automated motion (alignToTag, composites). */
     public static final LinearVelocity kAutoMaxSpeed = MetersPerSecond.of(1.0);
     public static final AngularVelocity kAutoMaxAngularRate = DegreesPerSecond.of(90);
@@ -258,20 +265,40 @@ public final class Constants {
     public static final double kCameraFromSideMeters = 0.195;
     public static final double kLeftCameraYawDeg = 90.0;   // faces left (+Y)
     public static final double kRightCameraYawDeg = -90.0; // faces right (−Y)
+
+    /**
+     * WHICH PHYSICAL SIDE IS THE DRIVETRAIN'S +X? The camera numbers above were measured from the side the team
+     * calls "front". The drivetrain's own +X is fixed by TunerConstants (module positions) and the Pigeon mount,
+     * and is the side that leads when the stick is pushed forward with the perspective at 0° (now forced). If that
+     * side is the OPPOSITE of the measured "front", every camera transform is off by exactly 180° and vision
+     * returns the true pose rotated 180° about the camera. Set this to false to rotate both transforms by 180°
+     * about Z (x → −x, y → −y, yaw + 180°) without re-measuring anything.
+     *
+     * <p>Test: robot on the floor, code running, DS enabled, stick pushed forward briefly → note which physical
+     * side led. If it was the measured "front": keep true. If it was the opposite side: set false.
+     * Then face the FRONT wall: Drive/Pose heading must read ≈ 0°, and each camera's Photon_Pose heading too.
+     */
+    public static final boolean kMeasuredFrontIsRobotPlusX = true; // TODO(hardware) H-14 — confirm with the test above
+
+    private static Transform3d cameraTransform(double xForward, double yLeft, double z, double yawDeg) {
+      final double sign = kMeasuredFrontIsRobotPlusX ? 1.0 : -1.0;
+      final double yaw = kMeasuredFrontIsRobotPlusX ? yawDeg : yawDeg + 180.0;
+      return new Transform3d(
+          new Translation3d(sign * xForward, sign * yLeft, z), new Rotation3d(0.0, 0.0, Math.toRadians(yaw)));
+    }
+
     public static final Transform3d kRobotToLeftCamera =
-        new Transform3d(
-            new Translation3d(
-                kFrameHalfWidthMeters - kCameraFromFrontMeters,
-                kFrameHalfWidthMeters - kCameraFromSideMeters,
-                kCameraHeightMeters),
-            new Rotation3d(0.0, 0.0, Math.toRadians(kLeftCameraYawDeg)));
+        cameraTransform(
+            kFrameHalfWidthMeters - kCameraFromFrontMeters,
+            kFrameHalfWidthMeters - kCameraFromSideMeters,
+            kCameraHeightMeters,
+            kLeftCameraYawDeg);
     public static final Transform3d kRobotToRightCamera =
-        new Transform3d(
-            new Translation3d(
-                kFrameHalfWidthMeters - kCameraFromFrontMeters,
-                -(kFrameHalfWidthMeters - kCameraFromSideMeters),
-                kCameraHeightMeters),
-            new Rotation3d(0.0, 0.0, Math.toRadians(kRightCameraYawDeg)));
+        cameraTransform(
+            kFrameHalfWidthMeters - kCameraFromFrontMeters,
+            -(kFrameHalfWidthMeters - kCameraFromSideMeters),
+            kCameraHeightMeters,
+            kRightCameraYawDeg);
 
     // TODO(hardware) H-15 — 3D-printed sheets: the common "Full Size" 36h11 plate is 10.5 in = 266.7 mm (= AndyMark
     // plate) with the true-scale 165.1 mm black square centred ("approx 27 cm" measured). kLocationTagSize is what
