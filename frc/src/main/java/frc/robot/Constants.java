@@ -170,10 +170,14 @@ public final class Constants {
   public static final class PincherConstants {
     private PincherConstants() {}
 
-    // TODO(hardware) H-12 — RoboRIO PWM channels (servos MUST be on the PWM header 0–9, not DIO: WPILib's Servo
-    // only drives PWM channels and DIO pins cannot generate servo pulses). Power the servos from a 5–6 V rail.
-    public static final int kJawAPwmChannel = 0;
-    public static final int kJawBPwmChannel = 1;
+    // H-12 (2026-09-20): the two pinch servos are wired to RoboRIO DIO 8 and DIO 9 and driven with the FPGA's
+    // DIO PWM generator (DigitalOutput.enablePWM, 50 Hz, ~7° resolution). Signal is 3.3 V logic; power the servos
+    // from a 5–6 V rail with a common ground if the DIO 5 V pins prove marginal.
+    public static final int kJawADioChannel = 8;
+    public static final int kJawBDioChannel = 9;
+    /** Pulse width at 0° / 180°. TODO(hardware) H-10 — trim if a servo buzzes at either end (typical 500–2500 µs). */
+    public static final double kServoMinPulseUs = 500.0;
+    public static final double kServoMaxPulseUs = 2500.0;
 
     // TODO(hardware) H-10 — jaw angles (deg, WPILib Servo.setAngle 0–180). Jaw B is mirrored.
     public static final double kJawAOpenDeg = 20.0;

@@ -26,6 +26,7 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Elevator;
+import frc.robot.subsystems.Pincher;
 import frc.robot.util.RobotState;
 import org.littletonrobotics.junction.Logger;
 
@@ -74,8 +75,9 @@ public class RobotContainer {
   public final Superstructure superstructure = new Superstructure(elevator, arm);
   private static final edu.wpi.first.units.measure.Distance kJogStep = Inches.of(1.0);
 
-  // ───────────── DISABLED (class intact; wiring at tag m0-hw) ─────────────
-  // public final Pincher pincher = new Pincher();
+  // ───────────── pincher servos on DIO 8/9 — SERVO-ANGLE TEST MODE ─────────────
+  // Angles follow NetworkTables /SmartDashboard/Pincher/servoA_deg and servoB_deg (0–180) every loop; no buttons.
+  public final Pincher pincher = new Pincher();
 
   public RobotContainer() {
     robotState.setAllSuppliers(drivetrain::getPose, drivetrain::getChassisSpeeds);

@@ -12,7 +12,12 @@ esp32/   endeffector/       one ESP32-S3 per end effector: DRV8833 DC motor, tim
 CAD/     mechanical design — source, exports, drawings, BOM
 ```
 
-## Current HEAD (tag `carousel-demo`): carousel grab / dock choreography
+## Current HEAD (tag `servo-test`): pinch-servo angle test on DIO 8/9
+
+- `subsystems/Pincher.java` now drives the two micro-servos from **RoboRIO DIO 8 / DIO 9** with the FPGA DIO PWM generator (`DigitalOutput.enablePWM`, 50 Hz, 0.5–2.5 ms = 0–180°; ~7° resolution). **Test mode:** every loop it follows NetworkTables `/SmartDashboard/Pincher/servoA_deg` and `servoB_deg` (0–180, default 90) — set them from AdvantageScope (NetworkTables tab → tuning mode), Elastic or Shuffleboard and watch the servos. Logged: `Pincher/servo{A,B}_{deg,pulse_us,duty}`. Sim-verified: NT 90/0/45/180/90 → 1500/500/1000/2500/1500 µs.
+- Carousel choreography below is unchanged (pinch steps are still dwells; wire `pincher.setAngles(...)` in once the open/closed angles are known).
+
+## Carousel grab / dock choreography (tag `carousel-demo`)
 
 - `commands/Superstructure.java`: `setEndpointPosition(armExtension, elevatorHeight)` moves both mechanisms together (done when both settle; 0.75 m/s caps stay in the subsystems); `grabFromCarousel(slot)` = align (arm `kPreGrabArmPosition`, elevator at the slot height) → arm to `kAttachmentPinchPosition` → [pinch dwell] → elevator up `kPostPinchElevatorRaiseHeight` → arm back → elevator to `kCarouselClearHeight`; `dockToCarousel(slot)` = align at slot + offset → arm extends → elevator drops → [un-pinch dwell] → arm pulls back. Every step requires its subsystem, so a new sequence interrupts the running one and the hold defaults take over.
 - `CarouselConstants.java` (all mock, `TODO(hardware) H-08`): `CarouselSlot.LEVEL_1` 0.30 m / `LEVEL_2` 0.60 m, pre-grab arm 0.02 m, pinch position 0.25 m, post-pinch raise 0.06 m, clear height 0.80 m (≤ the 0.84 m elevator cap), pinch dwell 0.5 s.
