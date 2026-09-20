@@ -70,8 +70,8 @@ public class Elevator extends SubsystemBase {
     /** Metres of carriage travel per mechanism rotation (drum circumference). */
     private static final double kMetersPerRot = 2.0 * Math.PI * 0.0191008;
     /** Speed cap requested 2026-09-20: ~0.75 m/s cruise, gentle accel. */
-    private static final double kCruiseRps = 0.75 / kMetersPerRot;   // 6.25 rot/s
-    private static final double kAccelRps2 = 3.0 / kMetersPerRot;    // 25 rot/s^2
+    private static final double kCruiseRps = 1.2 / kMetersPerRot;    // 10.0 rot/s = 1.2 m/s (was 0.75)
+    private static final double kAccelRps2 = 5.0 / kMetersPerRot;    // 41.7 rot/s^2 = 5 m/s^2 (was 3)
     /** Target limits: never below the calibrated zero; max = Setpoint.Top (7 rot = 0.84 m) + 16 in (raised 2 ft then lowered 8 in, 2026-09-20). */
     private static final double kJogMinRot = 0.0;
     private static final double kJogMaxRot = 7.0 + edu.wpi.first.math.util.Units.inchesToMeters(16.0) / kMetersPerRot; // +2 ft −8 in = +16 in → 10.39 rot = 1.25 m
