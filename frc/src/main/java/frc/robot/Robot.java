@@ -3,6 +3,7 @@ package frc.robot;
 import edu.wpi.first.wpilibj.simulation.DriverStationSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.util.RobotState;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -30,6 +31,9 @@ public class Robot extends LoggedRobot {
   @Override
   public void robotPeriodic() {
     CommandScheduler.getInstance().run();
+    // Rebuilt2026 pattern: RobotState publishes the fused pose / velocity / tag distances every loop.
+    RobotState.getInstance().logAllInputs();
+    RobotState.getInstance().logAllDistances();
     m_robotContainer.logPeriodic();
   }
 

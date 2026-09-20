@@ -12,11 +12,11 @@ FRC-style swerve robot (~65 kg, 1.5 m elevator, linear belt-driven arm, pincher 
 `export JAVA_HOME="$HOME/wpilib/2026/jdk"; export PATH="$JAVA_HOME/bin:$HOME/.platformio/penv/bin:$PATH"`
 
 ## Commands
-- `frc/` — `./gradlew build` · `./gradlew simulateJava` (GUI, keyboard joystick via simgui.json) · `SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless` (headless, auto-enabled; add `SUBZERO_SIM_ARM_TEST=1` for the arm + pincher self-test) · `./gradlew deploy` (**humans only**, robot at 10.13.60.2)
+- `frc/` — `./gradlew build` · `./gradlew simulateJava` (GUI, keyboard joystick via simgui.json) · `SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless` (headless, auto-enabled; `SUBZERO_SIM_VISION_TEST=1` = injected-error localization test; `SUBZERO_SIM_ARM_TEST=1` = arm + pincher self-test when those are wired) · `./gradlew deploy` (**humans only**, robot at 10.13.60.2)
 - `esp32/endeffector/` — `pio run -e endeffector-1` (tool 1 @ 10.13.60.31), `-e endeffector-2` (tool 2 @ .32) · `pio run -e <env> -t upload` · `pio device monitor`
 
-## Current robot configuration (tag `m0-hw`)
-Drivetrain (2025 chassis TunerConstants, rio bus) + Elevator (Tuner X CTREELEVATOR config, ids 50/61) + Arm (single Kraken X60 CAN 40, 14T HTD-5 pulley direct on the shaft = 0.070 m/rev, no switches, zero at power-on) + Pincher (two servos on RoboRIO PWM 0/1). Controls in `RobotContainer.java`. The full M1 vision/align/task stack is commented out in place; the last fully-wired version is tag `m1-sim`.
+## Current robot configuration (tag `vision-proto`)
+**Vision prototyping: drivetrain + vision only.** Two PhotonVision cameras `photoncamera_left` / `photoncamera_right` (side-facing, level, transforms measured in `Constants.VisionConstants`) fuse into the swerve pose estimator Rebuilt2026-style (`RoomCamera` = OrbitCamera lift, `updatePose()` in `CommandSwerveDrivetrain`, `util/RobotState` publishes the pose). Room AprilTag layout: `frc/tools/gen_room_layout.py` → `frc/src/main/deploy/room-layout.json` (upload the same file to PhotonVision; pipeline tag size 0.1651 m). Elevator / Arm / Pincher are disabled in `RobotContainer` only (classes intact; wiring at tag `m0-hw`). Sim proof: `SUBZERO_SIM_VISION_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless` injects a 1 m / 30° odometry error and vision must pull `Drive/Pose` back onto `Drive/SimTruthPose`.
 
 ## Rules
 - **Sim is the proof.** Agents claim "passes in sim (`frc/logs/akit_*.wpilog`)", never "tested on hardware" — humans say that.

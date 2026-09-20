@@ -1,42 +1,45 @@
 package frc.robot.subsystems;
 
-import static edu.wpi.first.units.Units.Meters;
-
 import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrainConstants;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Twist2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants;
-//import frc.robot.commands.AlignToTagCommand;
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
-import java.util.List;
+import frc.robot.util.RobotState;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
-//import org.photonvision.EstimatedRobotPose;
+import org.photonvision.EstimatedRobotPose;
 
 /**
  * Class that extends the Phoenix 6 SwerveDrivetrain class and implements Subsystem so it can easily
  * be used in command-based projects.
  *
- * <p>Base: the 2026 Tuner X Swerve Project Generator output (Rebuilt2026 key file) minus PathPlanner /
- * AutoBuilder, minus the OrbitCamera fields, minus SysId (WPILib's SysIdRoutine starts DataLogManager on
- * construction, which would compete with AdvantageKit's WPILOGWriter — A-06 / D-21). Vision fusion is
- * the 2025 SwerveProgrammingChassis {@code updatePose()} intent re-added on top of the frozen
- * {@link RoomCamera} seam (docs/contracts.md §3.1, A-10).
+ * <p>Base: the 2026 Tuner X Swerve Project Generator output as used by FRC 1360 (Rebuilt2026
+ * CommandSwerveDrivetrain) minus PathPlanner / AutoBuilder and minus SysId (WPILib's SysIdRoutine
+ * starts DataLogManager on construction, which would compete with AdvantageKit's WPILOGWriter —
+ * A-06 / D-21). Vision localisation is the Rebuilt2026 way: the two {@link RoomCamera}s are
+ * constructed INSIDE the drivetrain and {@link #updatePose()} (verbatim Rebuilt2026 loop) fuses
+ * every unread PhotonVision result at the end of {@link #periodic()}.
  *
  * <p>SignalLogger is never started here (A-06). AdvantageKit is the only WPILOG writer.
  *
@@ -55,12 +58,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /* Keep track if we've ever applied the operator perspective before or not */
   private boolean m_hasAppliedOperatorPerspective = false;
 
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Room cameras fused in {@link #updatePose()}; set once by RobotContainer via {@link #setCameras}. */
-//  private List<RoomCamera> m_cameras = List.of();
-
-  /** True once any vision estimate has been accepted (the outlier gate is bypassed until then). */
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  private boolean m_hasVisionFix = false;
-
   /**
    * Field-centric facing-angle request: the driver translates while the drivetrain holds a heading
    * (e.g. face a wall tag). Heading PID runs in radians on the odometry thread; tolerance set in the
@@ -73,6 +70,35 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
   public final Trigger swerveAtTargetHeading =
       new Trigger(() -> facingAngleRequest.HeadingController.atSetpoint());
+
+  // ───────────────────────────── room cameras (Rebuilt2026 style) ─────────────────────────────
+
+  private final RoomCamera leftCamera =
+      new RoomCamera(
+          Constants.VisionConstants.kRobotToLeftCamera, Constants.VisionConstants.kLeftCameraName);
+  private final RoomCamera rightCamera =
+      new RoomCamera(
+          Constants.VisionConstants.kRobotToRightCamera, Constants.VisionConstants.kRightCameraName);
+  private final RoomCamera[] swerveCameras = {leftCamera, rightCamera};
+
+  /** Vision estimates fused with FINITE std devs since boot (Drive/VisionMeasurementsAccepted). */
+  private long m_visionMeasurementsAccepted = 0;
+  /** Vision estimates handed over with MAX_VALUE std devs (ambiguity / distance gate) — no-ops. */
+  private long m_visionMeasurementsRejected = 0;
+
+  // ───────────────────────────── sim ground truth ─────────────────────────────
+
+  /** Where the sim robot (and the fused pose) starts; also the default sim truth. */
+  private static final Pose2d kSimStartPose = new Pose2d(1.0, 1.0, Rotation2d.kZero);
+
+  /**
+   * Sim only: ground-truth robot pose fed to each camera's VisionSystemSim. Integrated every loop from
+   * the robot-relative chassis speeds (NOT from getState().Pose, which vision corrects — that would
+   * make the sim test circular).
+   */
+  private Pose2d m_simTruthPose = kSimStartPose;
+
+  private double m_lastSimTruthTime = -1.0;
 
   /**
    * Constructs a CTRE SwerveDrivetrain using the specified constants.
@@ -132,65 +158,58 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     configureCommon();
   }
 
-  /** Shared constructor tail: sim thread, heading tolerance, scheduler registration. */
+  /** Shared constructor tail: sim thread + sim truth, heading tolerance, RobotState, scheduler registration. */
   private void configureCommon() {
     if (Utils.isSimulation()) {
       startSimThread();
+      // Sim starts inside the room with fused pose == truth; RobotContainer / the orchestrator's test
+      // may resetPose() elsewhere afterwards to prove vision pulls it back.
+      resetPose(kSimStartPose);
+      resetSimTruth(kSimStartPose);
     }
     facingAngleRequest.HeadingController.setTolerance(Math.toRadians(3.0));
     facingAngleRequest.HeadingController.enableContinuousInput(-Math.PI, Math.PI);
+    // Rebuilt2026 wires this from RobotContainer; doing it here too is idempotent and guarantees the
+    // cameras' "Robot Pose Transformed By Robot To Cam" publisher has a real pose from the first loop.
+    RobotState.getInstance().setAllSuppliers(this::getPose, this::getChassisSpeeds);
     // Register explicitly so periodic()/simulationPeriodic() (pose fusion + logging) run even before
     // RobotContainer binds a default command. The generated project relies on setDefaultCommand for this.
     register();
   }
 
-  // ───────────────────────────── frozen seam (§3.1) ─────────────────────────────
+  // ───────────────────────────── public accessors ─────────────────────────────
 
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Cameras to fuse in {@link #updatePose()}. Call once from RobotContainer after construction. */
-//  public void setCameras(RoomCamera... cams) {
-//    m_cameras = List.of(cams);
-//  }
-
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  /** Cameras fused by this drivetrain (empty until {@link #setCameras} is called). */
-//  public List<RoomCamera> getCameras() {
-//    return m_cameras;
-//  }
-
-  /** Current fused pose estimate (odometry + accepted vision), blue-alliance/room coordinates. */
+  /** Current fused pose estimate (odometry + accepted vision), room coordinates. */
   public Pose2d getPose() {
     return getState().Pose;
   }
 
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  /**
-//   * Fuse every camera's {@link RoomCamera#update()} into the pose estimator. Called once per loop
-//   * from {@link #periodic()}. Gate (2025 updatePose intent, re-enabled): an estimate farther than
-//   * {@link Constants.VisionConstants#kVisionOutlierGate} from the current pose is rejected — unless
-//   * no vision estimate has ever been accepted, so the first fix can pull odometry onto the room frame.
-//   */
-//  public void updatePose() {
-//    final Pose2d current = getPose();
-//    final double gateMeters = Constants.VisionConstants.kVisionOutlierGate.in(Meters);
-//    for (RoomCamera cam : m_cameras) {
-//      Optional<EstimatedRobotPose> est = cam.update(); // once per loop per camera (seam contract)
-//      final String key = "Drive/Vision/" + cam.getName();
-//      if (est.isEmpty()) {
-//        Logger.recordOutput(key + "/HasEstimate", false);
-//        continue;
-//      }
-//      final Pose2d visionPose = est.get().estimatedPose.toPose2d();
-//      final double jump = visionPose.getTranslation().getDistance(current.getTranslation());
-//      final boolean accepted = !m_hasVisionFix || jump <= gateMeters;
-//      Logger.recordOutput(key + "/HasEstimate", true);
-//      Logger.recordOutput(key + "/Pose", visionPose);
-//      Logger.recordOutput(key + "/JumpMeters", jump);
-//      Logger.recordOutput(key + "/Accepted", accepted);
-//      if (accepted) {
-//        // The override below converts the PhotonLib FPGA timestamp with Utils.fpgaToCurrentTime once.
-//        addVisionMeasurement(visionPose, est.get().timestampSeconds, cam.getEstimationStdDevs());
-//        m_hasVisionFix = true;
-//      }
-//    }
-//  }
+  /** Current robot-relative chassis speeds (getState().Speeds). */
+  public ChassisSpeeds getChassisSpeeds() {
+    return getState().Speeds;
+  }
+
+  /** The room cameras this drivetrain fuses (left, right). */
+  public RoomCamera[] getCameras() {
+    return swerveCameras;
+  }
+
+  /** Sim only: the ground-truth pose the vision sim sees (== kSimStartPose on the robot). */
+  public Pose2d getSimTruthPose() {
+    return m_simTruthPose;
+  }
+
+  /**
+   * Sim only: teleport the ground truth (and every camera's VisionSystemSim history) to {@code pose}.
+   * Does NOT touch odometry — pair with {@link #resetPose(Pose2d)} if the fused pose should follow.
+   */
+  public void resetSimTruth(Pose2d pose) {
+    m_simTruthPose = pose;
+    m_lastSimTruthTime = -1.0;
+    for (RoomCamera cam : swerveCameras) {
+      cam.resetSimPose(pose);
+    }
+  }
 
   /**
    * Returns a command that applies the specified control request to this swerve drivetrain.
@@ -201,15 +220,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   public Command applyRequest(Supplier<SwerveRequest> request) {
     return run(() -> this.setControl(request.get()));
   }
-
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  /**
-//   * Vision-leashed, speed-capped (safety §2/§7) drive to {@code robotToTagOffset} relative to tag
-//   * {@code tagId}. The command itself (W3) owns the leash, caps, tolerance and the 8 s timeout and
-//   * exposes {@link AlignToTagCommand#wasRefused()}.
-//   */
-//  public Command alignToTag(int tagId, Pose2d robotToTagOffset) {
-//    return new AlignToTagCommand(this, getCameras(), tagId, robotToTagOffset);
-//  }
 
   // ───────────────────────────── periodic / sim ─────────────────────────────
 
@@ -234,26 +244,54 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
               });
     }
 
-//    updatePose();
-
     // AdvantageKit lite (D-21): outputs only. Struct types (Pose2d, SwerveModuleState[], ChassisSpeeds) are free.
     final var state = getState();
     Logger.recordOutput("Drive/Pose", state.Pose);
+    Logger.recordOutput("Drive/Pose3d", new Pose3d(state.Pose));
     Logger.recordOutput("Drive/ModuleStates", state.ModuleStates);
     Logger.recordOutput("Drive/ModuleTargets", state.ModuleTargets);
     Logger.recordOutput("Drive/Speeds", state.Speeds);
-//    Logger.recordOutput("Drive/HasVisionFix", m_hasVisionFix);
-//    Logger.recordOutput("Drive/CameraCount", m_cameras.size());
+    Logger.recordOutput("Drive/CameraCount", swerveCameras.length);
+
+    this.updatePose();
+    Logger.recordOutput("Drive/VisionMeasurementsAccepted", m_visionMeasurementsAccepted);
+    Logger.recordOutput("Drive/VisionMeasurementsRejected", m_visionMeasurementsRejected);
   }
 
-//  /** Main-thread sim hook: feed ground truth to each camera's VisionSystemSim (seam: updateSimPose). */
-//  @Override
-// [M0: vision/align seam commented out — restore from tag m1-sim] //  public void simulationPeriodic() {
-//    final Pose2d truth = getPose();
-//    for (RoomCamera cam : m_cameras) {
-//      cam.updateSimPose(truth);
-//    }
-//  }
+  /**
+   * Sim only (scheduler calls this after periodic() when RobotBase.isSimulation()). Maintains the
+   * SEPARATE ground-truth pose: truth ← truth.exp(robot-relative speeds × dt), then feeds it to each
+   * camera's VisionSystemSim. Logs Drive/SimTruthPose and the fused-vs-truth error.
+   */
+  @Override
+  public void simulationPeriodic() {
+    final double now = Timer.getFPGATimestamp();
+    if (m_lastSimTruthTime >= 0.0) {
+      final double dt = MathUtil.clamp(now - m_lastSimTruthTime, 0.0, 0.1);
+      final ChassisSpeeds speeds = getState().Speeds; // robot-relative
+      m_simTruthPose =
+          m_simTruthPose.exp(
+              new Twist2d(
+                  speeds.vxMetersPerSecond * dt,
+                  speeds.vyMetersPerSecond * dt,
+                  speeds.omegaRadiansPerSecond * dt));
+    }
+    m_lastSimTruthTime = now;
+
+    for (RoomCamera cam : swerveCameras) {
+      cam.updateSimPose(m_simTruthPose);
+    }
+
+    final Pose2d fused = getState().Pose;
+    Logger.recordOutput("Drive/SimTruthPose", m_simTruthPose);
+    Logger.recordOutput("Drive/SimTruthPose3d", new Pose3d(m_simTruthPose));
+    Logger.recordOutput(
+        "Drive/SimPoseError_m",
+        fused.getTranslation().getDistance(m_simTruthPose.getTranslation()));
+    Logger.recordOutput(
+        "Drive/SimPoseError_deg",
+        Math.abs(fused.getRotation().minus(m_simTruthPose.getRotation()).getDegrees()));
+  }
 
   private void startSimThread() {
     m_lastSimTime = Utils.getCurrentTimeSeconds();
@@ -270,6 +308,36 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
               updateSimState(deltaTime, RobotController.getBatteryVoltage());
             });
     m_simNotifier.startPeriodic(kSimLoopPeriod);
+  }
+
+  // ───────────────────────────── vision fusion (Rebuilt2026 updatePose, verbatim) ─────────────────────────────
+
+  private void updatePose() {
+    for (RoomCamera orbitCamera : swerveCameras) {
+      orbitCamera.updatePipelineResults();
+      Optional<EstimatedRobotPose> visionEst = Optional.empty();
+      for (var result : orbitCamera.getPipelineResults()) {
+        visionEst = orbitCamera.getPhotonPoseEstimator().estimateCoprocMultiTagPose(result);
+        if (visionEst.isEmpty()) {
+          visionEst = orbitCamera.getPhotonPoseEstimator().estimateLowestAmbiguityPose(result);
+        }
+        orbitCamera.updateEstimationStdDevs(visionEst, result.getTargets());
+
+        visionEst.ifPresent(
+            est -> {
+              this.addVisionMeasurement(
+                  est.estimatedPose.toPose2d(),
+                  est.timestampSeconds,
+                  orbitCamera.getEstimationStdDevs());
+              if (orbitCamera.isEstimateRejected()) {
+                m_visionMeasurementsRejected++;
+              } else {
+                m_visionMeasurementsAccepted++;
+              }
+              orbitCamera.updateStructPublisher(est.estimatedPose.toPose2d());
+            });
+      }
+    }
   }
 
   // ───────────────────────────── vision timestamp plumbing ─────────────────────────────
