@@ -8,7 +8,9 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.CarouselConstants;
 import frc.robot.CarouselConstants.CarouselSlot;
 import frc.robot.subsystems.Arm;
+import frc.robot.Constants.PincherConstants;
 import frc.robot.subsystems.Elevator;
+import frc.robot.subsystems.Pincher;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -20,10 +22,12 @@ import org.littletonrobotics.junction.Logger;
 public class Superstructure {
   private final Elevator elevator;
   private final Arm arm;
+  private final Pincher pincher;
 
-  public Superstructure(Elevator elevator, Arm arm) {
+  public Superstructure(Elevator elevator, Arm arm, Pincher pincher) {
     this.elevator = elevator;
     this.arm = arm;
+    this.pincher = pincher;
   }
 
   /** Move the arm to {@code armExtension} and the elevator to {@code elevatorHeight} together; done when both settle. */
@@ -46,7 +50,7 @@ public class Superstructure {
             step("grab/1 align: arm pre-grab + elevator to slot " + slot,
                 setEndpointPosition(CarouselConstants.kPreGrabArmPosition, h)),
             step("grab/2 arm to pinch position", arm.goTo(CarouselConstants.kAttachmentPinchPosition)),
-            step("grab/3 PINCH (servo TBD)", pinchPlaceholder()),
+            step("grab/3 PINCH", pinch()),
             step("grab/4 elevator lift off hook", elevator.goTo(h.plus(CarouselConstants.kPostPinchElevatorRaiseHeight))),
             step("grab/5 arm back to pre-grab", arm.goTo(CarouselConstants.kPreGrabArmPosition)),
             step("grab/6 elevator to carousel clear height", elevator.goTo(CarouselConstants.kCarouselClearHeight)),
@@ -63,7 +67,7 @@ public class Superstructure {
                 setEndpointPosition(CarouselConstants.kPreGrabArmPosition, approach)),
             step("dock/2 arm extends to pinch position", arm.goTo(CarouselConstants.kAttachmentPinchPosition)),
             step("dock/3 elevator drops onto hook", elevator.goTo(h)),
-            step("dock/4 UN-PINCH (servo TBD)", unpinchPlaceholder()),
+            step("dock/4 UN-PINCH", release()),
             step("dock/5 arm pulls back", arm.goTo(CarouselConstants.kPreGrabArmPosition)),
             step("dock done", Commands.none()))
         .withName("DockToCarousel(" + slot + ")");
@@ -71,13 +75,14 @@ public class Superstructure {
 
   // ───────────── helpers ─────────────
 
-  /** Where the pincher will close; for now a logged dwell. */
-  private Command pinchPlaceholder() {
-    return Commands.waitSeconds(CarouselConstants.kPinchDwellSeconds);
+  /** Close the jaws (measured angles), then wait for the servos to get there. */
+  private Command pinch() {
+    return pincher.pinch().andThen(Commands.waitSeconds(PincherConstants.kServoTravelSeconds));
   }
 
-  private Command unpinchPlaceholder() {
-    return Commands.waitSeconds(CarouselConstants.kPinchDwellSeconds);
+  /** Open the jaws, then wait for the servos to get there. */
+  private Command release() {
+    return pincher.release().andThen(Commands.waitSeconds(PincherConstants.kServoTravelSeconds));
   }
 
   /** Logs the step name (console + AdvantageKit "Superstructure/step") before running it. */

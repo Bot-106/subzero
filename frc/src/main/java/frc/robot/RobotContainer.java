@@ -38,11 +38,11 @@ import org.littletonrobotics.junction.Logger;
  * publishes the fused pose / velocity / tag distances (Rebuilt2026 topic names) for AdvantageScope.
  *
  * <p>Carousel demo (mock geometry in {@link frc.robot.CarouselConstants}): A = dock at LEVEL_1, B = dock at
- * LEVEL_2, X = dock at LEVEL_1 then grab from LEVEL_2. {@link Superstructure#setEndpointPosition} moves both
- * mechanisms together. 1-inch jogs live on the D-pad: up / down = elevator ±1 in, right / left = arm ±1 in.
+ * LEVEL_2, X = dock at LEVEL_1 then grab from LEVEL_2 — with real pinch / un-pinch (measured servo angles).
+ * RB / LB = pinch / release by hand. {@link Superstructure#setEndpointPosition} moves both mechanisms together.
+ * 1-inch jogs live on the D-pad: up / down = elevator ±1 in, right / left = arm ±1 in.
  * Both mechanisms hold their targets with MotionMagic, cruise capped at 0.75 m/s. The elevator calibrates its
- * zero on the first teleop/test enable; the arm's zero is its power-on position. Pincher stays disabled here
- * (the pinch / un-pinch steps are logged dwells until the servos are wired).
+ * zero on the first teleop/test enable; the arm's zero is its power-on position. The pincher boots OPEN.
  *
  * <p>Controls: left stick = translate (field-centric), right stick X = rotate; Start = zero yaw
  * (seedFieldCentric — current heading becomes "forward" = toward the FRONT wall; moved from B).
@@ -72,12 +72,12 @@ public class RobotContainer {
   public final Elevator elevator = new Elevator();
   private boolean elevatorCalibrated = false;
   public final Arm arm = new Arm();
-  public final Superstructure superstructure = new Superstructure(elevator, arm);
+  public final Pincher pincher = new Pincher();
+  public final Superstructure superstructure = new Superstructure(elevator, arm, pincher);
   private static final edu.wpi.first.units.measure.Distance kJogStep = Inches.of(1.0);
 
-  // ───────────── pincher servos on PWM 8/9 — SERVO-ANGLE TEST MODE ─────────────
-  // Angles follow NetworkTables /SmartDashboard/Pincher/servoA_deg and servoB_deg (0–180) every loop; no buttons.
-  public final Pincher pincher = new Pincher();
+  // Pincher servos on PWM 8/9: angles follow NetworkTables /SmartDashboard/Pincher/servo{A,B}_deg every loop
+  // (dashboard override for testing); pinch()/release() write the measured closed/open pairs into those entries.
 
   public RobotContainer() {
     robotState.setAllSuppliers(drivetrain::getPose, drivetrain::getChassisSpeeds);
@@ -120,6 +120,10 @@ public class RobotContainer {
                 .andThen(superstructure.grabFromCarousel(CarouselSlot.LEVEL_2))
                 .withName("DockL1ThenGrabL2")
                 .onlyIf(() -> elevatorCalibrated));
+
+    // Manual pinch / release for bench checks (the choreography calls the same commands).
+    joystick.rightBumper().onTrue(pincher.pinch());
+    joystick.leftBumper().onTrue(pincher.release());
 
     // Incremental control moved to the D-pad — one press = one inch on the held target (clamped per axis).
     joystick.povUp().onTrue(elevator.jogBy(kJogStep));              // elevator up 1 in

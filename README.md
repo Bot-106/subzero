@@ -12,7 +12,11 @@ esp32/   endeffector/       one ESP32-S3 per end effector: DRV8833 DC motor, tim
 CAD/     mechanical design — source, exports, drawings, BOM
 ```
 
-## Current HEAD (tag `servo-test`): pinch-servo angle test on PWM 8/9
+## Current HEAD (tag `pinch-wired`): measured servo angles locked in, pinch/un-pinch in the choreography
+
+- Measured 2026-09-20 with the NT angle test: **servo A (PWM 8) 54° open / 89° pinched; servo B (PWM 9) 72° open / 37° pinched** (`PincherConstants.kJaw{A,B}{Open,Closed}Deg`). `Pincher.pinch()` / `release()` write those pairs; the jaws boot OPEN. `Superstructure` now really pinches at grab/3 and un-pinches at dock/4, each followed by `kServoTravelSeconds` (0.5 s). **RB / LB = pinch / release by hand.** The dashboard entries still override live for retesting. Sim (`akit_26-09-20_06-16-08.wpilog`): jaws 54/72 through the dock, 89/37 from grab/3 onward.
+
+## Previous step (tag `servo-test`): pinch-servo angle test on PWM 8/9
 
 - `subsystems/Pincher.java` drives the two micro-servos from **RoboRIO PWM header channels 8 / 9** with WPILib `Servo` (dedicated FPGA servo PWM, ~0.1° resolution; 0.5–2.5 ms = 0–180°, `PincherConstants.kServoMin/MaxPulseUs`). (The earlier DIO 8/9 `DigitalOutput.enablePWM` version had ~7° steps — in git history at `5fda487`.) **Test mode:** every loop it follows NetworkTables `/SmartDashboard/Pincher/servoA_deg` and `servoB_deg` (0–180, default 90) — set them from AdvantageScope (NetworkTables tab → tuning mode), Elastic or Shuffleboard and watch the servos. Logged: `Pincher/servo{A,B}_{deg,pulse_us,duty}`. Sim-verified: NT 90/0/45/180/90 → 1500/500/1000/2500/1500 µs.
 - Carousel choreography below is unchanged (pinch steps are still dwells; wire `pincher.setAngles(...)` in once the open/closed angles are known).

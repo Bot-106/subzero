@@ -179,11 +179,13 @@ public final class Constants {
     public static final double kServoMinPulseUs = 500.0;
     public static final double kServoMaxPulseUs = 2500.0;
 
-    // TODO(hardware) H-10 — jaw angles (deg, WPILib Servo.setAngle 0–180). Jaw B is mirrored.
-    public static final double kJawAOpenDeg = 20.0;
-    public static final double kJawAClosedDeg = 110.0;
-    public static final double kJawBOpenDeg = 160.0;
-    public static final double kJawBClosedDeg = 70.0;
+    // H-10 (MEASURED 2026-09-20 with the NT angle test): servo A = PWM 8, servo B = PWM 9.
+    public static final double kJawAOpenDeg = 54.0;   // A unpinched
+    public static final double kJawAClosedDeg = 89.0; // A pinched
+    public static final double kJawBOpenDeg = 72.0;   // B unpinched
+    public static final double kJawBClosedDeg = 37.0; // B pinched
+    /** Time allowed for the servos to travel between open and closed before the next choreography step. */
+    public static final double kServoTravelSeconds = 0.5;
 
     // TODO(hardware) H-10 — jaw gap when fully open (mm); 0 = closed on the tool.
     public static final double kJawMaxMm = 40.0;

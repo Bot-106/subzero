@@ -46,6 +46,4 @@ public final class CarouselConstants {
   // Must stay ≤ the elevator's target cap (7 rot = 0.84 m until H-01 is measured).
   public static final Distance kCarouselClearHeight = Meters.of(0.80);
 
-  /** Placeholder dwell where the pincher servos will act (servo integration comes later). */
-  public static final double kPinchDwellSeconds = 0.5;
 }
