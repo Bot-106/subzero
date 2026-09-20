@@ -40,6 +40,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import edu.wpi.first.math.filter.Debouncer;
+import edu.wpi.first.math.filter.Debouncer.DebounceType;
 import org.littletonrobotics.junction.Logger;
 
 public class Elevator extends SubsystemBase {
@@ -275,6 +277,41 @@ public class Elevator extends SubsystemBase {
     /* Persistent MotionMagic target in mechanism rotations; the default command holds it. */
     private double targetRotations = 0.0;
 
+    /** Position-reached detection: within kTargetToleranceM of the target for kSettleSeconds. */
+    private static final double kTargetToleranceM = 0.01;
+    private static final double kSettleSeconds = 0.2;
+    private boolean atTargetLatched = false;
+    private Debouncer atTargetDebouncer = new Debouncer(kSettleSeconds, DebounceType.kRising);
+
+    /** Carriage height above the calibrated zero (metres). */
+    public Distance getHeight() {
+        return Meters.of(motor_id_50Position.getValueAsDouble() * kMetersPerRot);
+    }
+
+    /** True once the carriage has been within tolerance of the current target for kSettleSeconds. */
+    public boolean atTarget() {
+        return atTargetLatched;
+    }
+
+    private void setTargetMeters(double meters) {
+        targetRotations = Math.max(kJogMinRot, Math.min(kJogMaxRot, meters / kMetersPerRot));
+        atTargetLatched = false; // reset the settle latch so a move issued from rest cannot finish instantly
+        atTargetDebouncer = new Debouncer(kSettleSeconds, DebounceType.kRising);
+    }
+
+    /**
+     * MotionMagic to {@code height} (clamped to [0, kJogMaxRot]) at the capped cruise speed; REQUIRES the
+     * elevator (so a new move/sequence interrupts the previous one) and finishes once at the target for
+     * kSettleSeconds. The default holdTarget() then keeps holding the same target.
+     */
+    public Command goTo(Distance height) {
+        final double meters = height.in(Meters);
+        return runOnce(() -> setTargetMeters(meters))
+            .andThen(run(() -> motor_id_50.setControl(setpointRequest.withPosition(Rotations.of(targetRotations)))))
+            .until(this::atTarget)
+            .withName(String.format("ElevatorGoTo(%.3f m)", meters));
+    }
+
     /** Current jog/hold target. */
     public Angle getTarget() {
         return Rotations.of(targetRotations);
@@ -294,7 +331,7 @@ public class Elevator extends SubsystemBase {
         final double deltaRot = delta.in(Meters) / kMetersPerRot;
         // No subsystem requirement: it only moves the target that holdTarget() (the default command) follows.
         return edu.wpi.first.wpilibj2.command.Commands.runOnce(() -> {
-            targetRotations = Math.max(kJogMinRot, Math.min(kJogMaxRot, targetRotations + deltaRot));
+            setTargetMeters((targetRotations + deltaRot) * kMetersPerRot);
             System.out.printf("Elevator: target -> %.3f rot (%.3f m)%n", targetRotations, targetRotations * kMetersPerRot);
         }).withName("ElevatorJog");
     }
@@ -360,10 +397,14 @@ public class Elevator extends SubsystemBase {
             motor_id_50Position.getValueAsDouble() * kDrumRadius.in(Meters) * 2 * Math.PI
         );
 
+        atTargetLatched = atTargetDebouncer.calculate(
+            Math.abs(motor_id_50Position.getValueAsDouble() - targetRotations) * kMetersPerRot < kTargetToleranceM);
+
         /* AdvantageKit lite outputs (logging only) */
         Logger.recordOutput("Elevator/position_rot", motor_id_50Position.getValueAsDouble());
         Logger.recordOutput("Elevator/target_rot", targetRotations);
         Logger.recordOutput("Elevator/target_m", targetRotations * kMetersPerRot);
+        Logger.recordOutput("Elevator/atTarget", atTargetLatched);
         Logger.recordOutput("Elevator/height_m", motor_id_50Position.getValueAsDouble() * kDrumRadius.in(Meters) * 2 * Math.PI);
         Logger.recordOutput("Elevator/velocity_rps", motor_id_50Velocity.getValueAsDouble());
         Logger.recordOutput("Elevator/torqueCurrent_a", motor_id_50TorqueCurrent.getValueAsDouble());

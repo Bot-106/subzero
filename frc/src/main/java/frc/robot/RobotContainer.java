@@ -19,7 +19,9 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.CarouselConstants.CarouselSlot;
 import frc.robot.Constants.OperatorConstants;
+import frc.robot.commands.Superstructure;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Arm;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
@@ -34,10 +36,12 @@ import org.littletonrobotics.junction.Logger;
  * Rebuilt2026-style, and fuse into its pose estimator in {@code updatePose()}. {@link RobotState}
  * publishes the fused pose / velocity / tag distances (Rebuilt2026 topic names) for AdvantageScope.
  *
- * <p>Elevator and Arm move INCREMENTALLY: X / Y = elevator target +1 in / −1 in, A / B = arm target
- * +1 in / −1 in (one press = one inch; both subsystems hold their target with MotionMagic, cruise capped at
- * 0.75 m/s). The elevator calibrates its zero on the first teleop/test enable; the arm's zero is its
- * power-on position. Pincher stays disabled here (class intact; wiring at tag {@code m0-hw}).
+ * <p>Carousel demo (mock geometry in {@link frc.robot.CarouselConstants}): A = dock at LEVEL_1, B = dock at
+ * LEVEL_2, X = dock at LEVEL_1 then grab from LEVEL_2. {@link Superstructure#setEndpointPosition} moves both
+ * mechanisms together. 1-inch jogs live on the D-pad: up / down = elevator ±1 in, right / left = arm ±1 in.
+ * Both mechanisms hold their targets with MotionMagic, cruise capped at 0.75 m/s. The elevator calibrates its
+ * zero on the first teleop/test enable; the arm's zero is its power-on position. Pincher stays disabled here
+ * (the pinch / un-pinch steps are logged dwells until the servos are wired).
  *
  * <p>Controls: left stick = translate (field-centric), right stick X = rotate; Start = zero yaw
  * (seedFieldCentric — current heading becomes "forward" = toward the FRONT wall; moved from B).
@@ -67,6 +71,7 @@ public class RobotContainer {
   public final Elevator elevator = new Elevator();
   private boolean elevatorCalibrated = false;
   public final Arm arm = new Arm();
+  public final Superstructure superstructure = new Superstructure(elevator, arm);
   private static final edu.wpi.first.units.measure.Distance kJogStep = Inches.of(1.0);
 
   // ───────────── DISABLED (class intact; wiring at tag m0-hw) ─────────────
@@ -101,11 +106,24 @@ public class RobotContainer {
                 .unless(() -> elevatorCalibrated)
                 .withName("ElevatorCalibrateZero"));
 
-    // Incremental control — one press = one inch on the held target (clamped to each axis' limits).
-    joystick.x().onTrue(elevator.jogBy(kJogStep));            // elevator up 1 in
-    joystick.y().onTrue(elevator.jogBy(kJogStep.unaryMinus())); // elevator down 1 in
-    joystick.a().onTrue(arm.jogBy(kJogStep));                 // arm out 1 in
-    joystick.b().onTrue(arm.jogBy(kJogStep.unaryMinus()));    // arm in 1 in
+    // Carousel demo sequences (mock geometry, CarouselConstants). A new sequence interrupts a running one.
+    // Gated on elevatorCalibrated so a press during the first-enable calibration cannot cancel it (bad zero).
+    joystick.a().onTrue(superstructure.dockToCarousel(CarouselSlot.LEVEL_1).onlyIf(() -> elevatorCalibrated));
+    joystick.b().onTrue(superstructure.dockToCarousel(CarouselSlot.LEVEL_2).onlyIf(() -> elevatorCalibrated));
+    joystick
+        .x()
+        .onTrue(
+            superstructure
+                .dockToCarousel(CarouselSlot.LEVEL_1)
+                .andThen(superstructure.grabFromCarousel(CarouselSlot.LEVEL_2))
+                .withName("DockL1ThenGrabL2")
+                .onlyIf(() -> elevatorCalibrated));
+
+    // Incremental control moved to the D-pad — one press = one inch on the held target (clamped per axis).
+    joystick.povUp().onTrue(elevator.jogBy(kJogStep));              // elevator up 1 in
+    joystick.povDown().onTrue(elevator.jogBy(kJogStep.unaryMinus())); // elevator down 1 in
+    joystick.povRight().onTrue(arm.jogBy(kJogStep));                // arm out 1 in
+    joystick.povLeft().onTrue(arm.jogBy(kJogStep.unaryMinus()));    // arm in 1 in
 
     // ── DISABLED (restore from tag m0-hw) ──
     // joystick.back().onTrue(arm.zeroHere());
@@ -179,6 +197,25 @@ public class RobotContainer {
                       arm.jogBy(kJogStep), Commands.waitSeconds(1.5),
                       arm.jogBy(kJogStep.unaryMinus()), Commands.waitSeconds(1.5))
                   .withName("SimJogTest"));
+    }
+  }
+
+  /**
+   * Sim self-test (agents): SUBZERO_SIM_CAROUSEL_TEST=1 SUBZERO_SIM_AUTOENABLE=teleop ./gradlew simulateJava -Pheadless
+   * → the X-button sequence (dock LEVEL_1, then grab LEVEL_2); watch Superstructure/step, Elevator/height_m,
+   * Arm/extension_m in frc/logs/akit_*.wpilog.
+   */
+  {
+    if (RobotBase.isSimulation() && System.getenv("SUBZERO_SIM_CAROUSEL_TEST") != null) {
+      // Starts once calibrateZero has finished (the sequence requires the elevator, so it must not be scheduled
+      // on the same enable edge as the calibration command).
+      new Trigger(() -> elevatorCalibrated)
+          .onTrue(
+              Commands.sequence(
+                      Commands.waitSeconds(1.0),
+                      superstructure.dockToCarousel(CarouselSlot.LEVEL_1),
+                      superstructure.grabFromCarousel(CarouselSlot.LEVEL_2))
+                  .withName("SimCarouselTest"));
     }
   }
 

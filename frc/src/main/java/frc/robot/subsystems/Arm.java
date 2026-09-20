@@ -215,6 +215,8 @@ public class Arm extends SubsystemBase {
                       setpointMeters + deltaM,
                       ArmConstants.kSoftLimitIn.in(Meters),
                       ArmConstants.kSoftLimitOut.in(Meters));
+              atSetpointLatched = false;
+              atSetpointDebouncer = new Debouncer(ArmConstants.kToleranceHoldSeconds, DebounceType.kRising);
               System.out.printf("Arm: target -> %.3f m%n", setpointMeters);
             })
         .withName("ArmJog");
